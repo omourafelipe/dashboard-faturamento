@@ -146,6 +146,23 @@
   .g-chk{display:flex;gap:.65rem;align-items:flex-start;padding:.6rem 0;border-bottom:1px solid var(--line);font-size:.8125rem;line-height:1.45}
   .g-chk:last-child{border-bottom:0}
   .g-chk b{font-weight:500}
+  /* ---- Aba Diagnóstico ---- */
+  #view-diag>*{min-width:0}
+  .dg-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 20px;padding:14px 16px}
+  .dg-bar .g-f{min-width:170px}
+  .dg-nav{overflow-x:auto;max-width:100%;padding-bottom:2px}
+  .dg-2{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
+  @media (min-width:1024px){.dg-2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .tbl tr.dg-hl td{background:var(--brand-soft)}
+  .dg-note{padding:10px 16px 14px;font-size:.78rem;line-height:1.5;color:var(--muted)}
+  .dg-heat{border-collapse:separate;border-spacing:2px;font-size:.7rem;width:100%}
+  .dg-heat th{font-weight:500;color:var(--muted);text-align:center;padding:.15rem .2rem;white-space:nowrap}
+  .dg-heat th.rowh{text-align:left;padding-right:.6rem;color:var(--ink-2);font-weight:600}
+  .dg-heat td{text-align:center;min-width:40px;padding:.4rem .15rem;border-radius:4px;background:var(--surface-2);color:var(--ink);white-space:nowrap}
+  .dg-heat td.z{color:var(--muted)}
+  .dg-heat td.t{background:transparent;font-weight:600;text-align:right;padding-left:.5rem}
+  #filters.nodt [data-dt]{display:none}
+  .dg-sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:.35rem;vertical-align:-1px}
   @media print{
     @page{size:A4 landscape;margin:10mm}
     body{background:#fff!important;font-size:12px}
@@ -167,6 +184,8 @@
     .pg2{grid-template-columns:repeat(2,minmax(0,1fr))!important}
     .pg3{grid-template-columns:repeat(3,minmax(0,1fr))!important}
     .g-grid.g-21{grid-template-columns:minmax(0,3fr) minmax(0,2fr)!important}
+    .dg-2{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+    .dg-heat td{min-width:0!important}
     .pg5{grid-template-columns:repeat(5,minmax(0,1fr))!important}
     .pg3>.lg\:col-span-2,.pg5>.lg\:col-span-2{grid-column:span 2 / span 2!important}
     .pg5>.lg\:col-span-3{grid-column:span 3 / span 3!important}
@@ -285,6 +304,7 @@
 
     <div id="view-validation" class="hidden space-y-4"></div>
     <div id="view-grupo" class="hidden space-y-4"></div>
+    <div id="view-diag" class="hidden space-y-4"></div>
   </div>
 </main>
 
@@ -856,6 +876,7 @@ const ICON = {
   sheet: '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
   printer: '<path d="M7 9V3h10v6M7 17H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-2M7 14h10v7H7z"/>',
   chart: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
+  pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
@@ -947,7 +968,7 @@ function applyScope() {
   S.meta = (all && multi) ? Object.assign({}, metaAll, { empresa: 'Todas as empresas (consolidado)', cnpj: '' }) : Object.assign({}, metaAll, co ? { empresa: co.name, cnpj: co.cnpj } : {});
   S.tomList = [...R.tom.values()].sort((a, b) => b.vc - a.vc);
   S.V = buildValidation(S.sources, RA.notes, RA.cross, metaAll, RA.tom);
-  S.F = defaultFilters(R.avail); S.cmp = cmpDefaults(); S.tax = 'ic'; S.tbl.page = 1; S.gran = null; S.fatMode = null;
+  S.F = defaultFilters(R.avail); S.D = null; S.cmp = cmpDefaults(); S.tax = 'ic'; S.tbl.page = 1; S.gran = null; S.fatMode = null;
   S.dim = (all && multi) ? 'emp' : (S.dim === 'emp' ? 'cat' : S.dim);   /* consolidado: abre o gráfico por empresa */
   renderEmpBar();
   renderFilters();
@@ -990,7 +1011,7 @@ function renderFilters() {
   const a = S.avail;
   $('#filters').innerHTML = `
   <div class="flex flex-wrap items-end gap-3 p-3 sm:p-4">
-    <div class="w-full sm:w-44"><label class="lbl" for="f-month">Competência</label>
+    <div class="w-full sm:w-44" data-dt><label class="lbl" for="f-month">Competência</label>
       <select id="f-month" class="inp"><option value="">Todas</option>${a.months.map(m => `<option value="${m}">${fmtComp(m)}</option>`).join('')}</select></div>
     <div class="relative min-w-[240px] flex-1 sm:max-w-md"><label class="lbl" for="f-tom">Tomador</label>
       <input id="f-tom" class="inp" type="search" autocomplete="off" placeholder="Digite o nome ou o CPF/CNPJ do tomador" aria-label="Buscar tomador">
@@ -1003,8 +1024,8 @@ function renderFilters() {
   </div>
   <div id="tom-chips" class="flex flex-wrap gap-2 px-3 pb-3 sm:px-4 empty:hidden"></div>
   <div id="f-adv" class="grid gap-x-5 gap-y-4 border-t p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-4" style="border-color:var(--line)">
-    <div><label class="lbl" for="f-from">Data inicial</label><input id="f-from" type="date" class="inp" min="${a.minDate}" max="${a.maxDate}"></div>
-    <div><label class="lbl" for="f-to">Data final</label><input id="f-to" type="date" class="inp" min="${a.minDate}" max="${a.maxDate}"></div>
+    <div data-dt><label class="lbl" for="f-from">Data inicial</label><input id="f-from" type="date" class="inp" min="${a.minDate}" max="${a.maxDate}"></div>
+    <div data-dt><label class="lbl" for="f-to">Data final</label><input id="f-to" type="date" class="inp" min="${a.minDate}" max="${a.maxDate}"></div>
     <div class="grid grid-cols-2 gap-2">
       <div><label class="lbl" for="f-min">Valor mínimo (R$)</label><input id="f-min" type="number" min="0" step="0.01" inputmode="decimal" class="inp" placeholder="0,00"></div>
       <div><label class="lbl" for="f-max">Valor máximo (R$)</label><input id="f-max" type="number" min="0" step="0.01" inputmode="decimal" class="inp" placeholder="sem limite"></div>
@@ -1048,12 +1069,13 @@ function renderHeader() {
   if (S.view === 'grupo') txt = 'Empresas do Grupo (todos os emitentes dos arquivos)';
   $('#hdr-sub').textContent = txt; $('#hdr-sub').title = txt;
   const bad = S.V.quality.some(q => q.alert) || S.V.recon.some(r => r.status === 'err');
-  const tabs = [['overview', 'chart', 'Visão geral'], ['table', 'table', `NFS-e (${NUM.format(S.filtered.length)})`], ['grupo', 'group', 'Grupo'], ['validation', 'shield', 'Validação']];
+  const tabs = [['overview', 'chart', 'Visão geral'], ['diag', 'pulse', 'Diagnóstico'], ['table', 'table', `NFS-e (${NUM.format(S.filtered.length)})`], ['grupo', 'group', 'Grupo'], ['validation', 'shield', 'Validação']];
   $('#tabs').innerHTML = tabs.map(t => `<button role="tab" class="tab" data-action="tab" data-v="${t[0]}" aria-selected="${S.view === t[0]}">${ico(t[1])}${t[2]}${t[0] === 'validation' && bad ? '<span class="dot" style="background:var(--amber);border-radius:50%;width:8px;height:8px"></span>' : ''}</button>`).join('');
 }
 function showView() {
-  ['overview', 'table', 'validation', 'grupo'].forEach(v => $('#view-' + v).classList.toggle('hidden', v !== S.view));
+  ['overview', 'table', 'validation', 'grupo', 'diag'].forEach(v => $('#view-' + v).classList.toggle('hidden', v !== S.view));
   $('#filters').classList.toggle('hidden', S.view === 'validation' || S.view === 'grupo');
+  $('#filters').classList.toggle('nodt', S.view === 'diag');   /* o Diagnóstico escolhe a competência na própria aba */
   $('#emp-bar').toggleAttribute('hidden', S.view === 'grupo');   /* a aba Grupo usa todas as empresas */
   $('#alerts').toggleAttribute('hidden', S.view === 'grupo');
   renderHeader();
@@ -1079,7 +1101,7 @@ function renderAlerts() {
 function renderAll() { applyFilter(); renderHeader(); renderAlerts(); syncFilters(); showView(); renderActiveView(); }
 function renderActiveView() {
   renderHeader();
-  if (S.view === 'overview') renderOverview(); else if (S.view === 'table') renderTable(); else if (S.view === 'grupo') renderGrupo(); else renderValidation();
+  if (S.view === 'overview') renderOverview(); else if (S.view === 'table') renderTable(); else if (S.view === 'grupo') renderGrupo(); else if (S.view === 'diag') renderDiag(); else renderValidation();
 }
 
 /* ---------- Visão geral ---------- */
@@ -1416,6 +1438,8 @@ function exportXlsx() {
   XLSX.utils.book_append_sheet(wb, mkSheet(['#', 'Tomador', 'CPF/CNPJ', 'Faturamento', ...TAXES.filter(z => S.avail.tax[z.k]).map(x => x.label), 'NFS-e', '% do faturamento'], tg.map((x, i) => [i + 1, S.tom.get(x.key).name, S.tom.get(x.key).doc, x.vc / 100, ...TAXES.filter(z => S.avail.tax[z.k]).map(y => x[y.k] / 100), x.n, t.vc ? x.vc / t.vc : 0]), ['int', 'text', 'text', 'money', ...TAXES.filter(z => S.avail.tax[z.k]).map(() => 'money'), 'int', 'pct'], [6, 56, 20, 18, ...TAXES.filter(z => S.avail.tax[z.k]).map(() => 18), 10, 16]), 'Por tomador');
   const dimSheet = (name, fn, label, src) => { src = src || S.filtered; const tv = src.reduce((a, n) => a + n.vc, 0); return XLSX.utils.book_append_sheet(wb, mkSheet([label, 'Faturamento', 'ISSQN', 'NFS-e', '% do faturamento'], groupBy(src, fn).sort((a, b) => b.vc - a.vc).map(x => [x.key, x.vc / 100, x.ic / 100, x.n, tv ? x.vc / tv : 0]), ['text', 'money', 'money', 'int', 'pct'], [28, 18, 16, 10, 16]), name); };
   if (isConsolidated()) dimSheet('Por empresa', n => n.empName, 'Empresa'); dimSheet('Por retenção ISSQN', n => n.ret, 'Retenção ISSQN'); dimSheet('Por situação', n => n.sit, 'Situação'); dimSheet('Contratação (Plano Saúde)', n => n.contr, 'Tipo de contratação', S.filtered.filter(n => n.cat === 'Plano de Saúde')); if (cat) dimSheet('Por tipo de serviço', n => n.cat, 'Tipo de serviço');
+  /* Diagnóstico mensal */
+  { const Dg = dModel(); if (Dg.months.length) { const X = dMonthlyTable(Dg); XLSX.utils.book_append_sheet(wb, mkSheet(X.h, X.rows, X.t, X.w), 'Diagnóstico mensal'); } }
   /* Validação */
   const vr = [...S.V.quality.map(q => ['Qualidade', q.label, q.value, q.detail]), ...(S.V.resumo || []).map(r => ['Resumo', `${r.file}: ${r.label}`, r.status === 'ok' ? 'Confere' : 'Não confere', `Dashboard: ${r.dash}; Resumo: ${r.res}`]), ...S.V.recon.map(r => ['Rodapé', `${r.file}: ${r.metric}`, r.status === 'ok' ? 'Confere' : r.status === 'err' ? 'Não confere' : 'Sem rodapé', r.text])];
   XLSX.utils.book_append_sheet(wb, mkSheet(['Seção', 'Verificação', 'Resultado', 'Detalhe'], vr, ['text', 'text', 'text', 'text'], [12, 52, 26, 100]), 'Validação');
@@ -1424,7 +1448,7 @@ function exportXlsx() {
 }
 function renderPrintHead() {
   const m = S.meta;
-  $('#print-head').innerHTML = `<div style="border-bottom:2px solid #0d6b73;padding-bottom:8px;margin-bottom:10px"><div style="font-size:18px;font-weight:600">Dashboard de faturamento NFS-e${S.view === 'grupo' ? ' | Faturamento entre empresas do Grupo' : ''}</div>
+  $('#print-head').innerHTML = `<div style="border-bottom:2px solid #0d6b73;padding-bottom:8px;margin-bottom:10px"><div style="font-size:18px;font-weight:600">Dashboard de faturamento NFS-e${S.view === 'grupo' ? ' | Faturamento entre empresas do Grupo' : S.view === 'diag' ? ' | Diagnóstico' : ''}</div>
     <div style="font-size:12px;color:#37495a">${esc([m.empresa, m.cnpj ? 'CNPJ ' + m.cnpj : '', m.periodoDe ? `competência ${m.periodoDe} a ${m.periodoAte}` : ''].filter(Boolean).join(', '))}</div>
     <div style="font-size:11px;color:#5b6d79;margin-top:3px">Filtros: ${esc((S.view === 'grupo' ? describeG() : describeFilters()).join(' | '))}. Gerado em ${new Date().toLocaleString('pt-BR')}.</div></div>`;
 }
@@ -1631,6 +1655,435 @@ function renderGrupo() {
   }
 }
 
+/* =====================================================================
+   ABA DIAGNÓSTICO: crescimento, carteira de tomadores, composição, tributos,
+   padrões de emissão e alertas.
+   Só lê a base já carregada (S.notes) e os filtros atuais, exceto os de data
+   (a competência de referência é escolhida na própria aba). Nada é gravado nem
+   alterado. Valores em centavos inteiros; percentuais só no final.
+   ===================================================================== */
+const DIAG = {
+  faixas: [100000, 500000, 1000000, 5000000, 10000000],   /* limites das faixas de valor da nota, em centavos: R$ 1 mil, 5 mil, 10 mil, 50 mil, 100 mil */
+  atipicoMult: 3, atipicoMinNotas: 5,                      /* nota atípica: acima de 3x a mediana do tomador, que precisa ter ao menos 5 notas */
+  topN: [1, 5, 10, 20],
+};
+const DSEC = [['cresc', 'Crescimento'], ['cart', 'Carteira'], ['comp', 'Composição'], ['trib', 'Tributos'], ['pad', 'Padrões'], ['alert', 'Alertas'], ['conf', 'Conferências']];
+const D_WD = [1, 2, 3, 4, 5, 6, 0], D_WDN = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+
+/* ---------- cálculo (funções sem efeito colateral) ---------- */
+const dPrevYm = ym => { let y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1; if (m < 1) { m = 12; y--; } return y + '-' + pad2(m); };
+const dYearAgo = ym => (+ym.slice(0, 4) - 1) + ym.slice(4);
+const dVar = (cur, prev) => (cur === null || cur === undefined || prev === null || prev === undefined || prev === 0) ? null : (cur - prev) / Math.abs(prev);
+/* Percentil por interpolação linear (igual ao PERCENTIL.INC do Excel). `sorted` em ordem crescente. */
+function dPctl(sorted, p) {
+  const n = sorted.length; if (!n) return null;
+  const pos = (n - 1) * p, lo = Math.floor(pos), hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+const dIso = s => (s && /^\d{2}\/\d{2}\/\d{4}$/.test(s)) ? s.slice(6) + '-' + s.slice(3, 5) + '-' + s.slice(0, 2) : '';
+
+/* Base do Diagnóstico = NFS-e que passam nos filtros, exceto datas. Agrupa por competência. */
+function dModel() {
+  const base = S.notes.filter(n => passes(n, S.F, { noDate: true }));
+  const dated = base.filter(n => n.ym);
+  const present = [...new Set(dated.map(n => n.ym))].sort(), months = [];
+  if (present.length) { let k = present[0], g = 0; while (k <= present[present.length - 1] && g++ < 1200) { months.push(k); k = nextMonth(k); } }
+  const byM = new Map(months.map(m => [m, []])); for (const n of dated) byM.get(n.ym).push(n);
+  const rows = new Map(), tomM = new Map(), firstYm = new Map();
+  for (const m of months) {
+    const list = byM.get(m), s = summarize(list), tm = new Map(), vals = [];
+    for (const n of list) {
+      let t = tm.get(n.tomKey); if (!t) tm.set(n.tomKey, t = { vc: 0, n: 0 }); t.vc += n.vc; t.n++; vals.push(n.vc);
+      if (!firstYm.has(n.tomKey)) firstYm.set(n.tomKey, m);   /* meses em ordem crescente: o primeiro registro é a primeira competência */
+    }
+    vals.sort((a, b) => a - b);
+    rows.set(m, Object.assign(s, { ym: m, list, tm, mean: s.n ? s.vc / s.n : null, med: dPctl(vals, 0.5), p25: dPctl(vals, 0.25), p75: dPctl(vals, 0.75), min: vals.length ? vals[0] : null, max: vals.length ? vals[vals.length - 1] : null }));
+    tomM.set(m, tm);
+  }
+  const ytd = new Map(); let acc = 0, yr = '';
+  for (const m of months) { if (m.slice(0, 4) !== yr) { yr = m.slice(0, 4); acc = 0; } acc += rows.get(m).vc; ytd.set(m, acc); }
+  /* Competência mais recente possivelmente incompleta: o relatório termina (ou foi gerado) antes do fim do mês. */
+  const last = months.length ? months[months.length - 1] : null, pAte = S.sources.map(s => dIso(s.meta.periodoAte)).filter(Boolean).sort().pop() || '', emis = S.sources.map(s => dIso(s.meta.emissao)).filter(Boolean).sort().pop() || '';
+  let inc = null;
+  if (last) { const end = monthEnd(last);
+    if (pAte && pAte < end) inc = { ym: last, why: `o período do relatório vai só até ${fmtDate(pAte)}, antes do fim da competência (${fmtDate(end)})` };
+    else if (emis && emis < end) inc = { ym: last, why: `o relatório foi gerado em ${fmtDate(emis)}, antes do fim da competência (${fmtDate(end)})` };
+  }
+  return { base, dated, noYm: base.length - dated.length, months, rows, tomM, firstYm, ytd, inc, last };
+}
+/* Ponte: diferença de faturamento entre a competência de comparação (P) e a de referência (R), por tomador. */
+function dBridge(D, rYm, pYm) {
+  const tr = D.tomM.get(rYm), tp = D.tomM.get(pYm);
+  const o = { P: D.rows.get(pYm).vc, R: D.rows.get(rYm).vc, nov: 0, aum: 0, red: 0, perd: 0, nN: 0, nA: 0, nR: 0, nI: 0, nP: 0, novFirst: 0, novBack: 0, items: [] };
+  for (const [k, r] of tr) {
+    const p = tp.get(k);
+    if (!p) { o.nov += r.vc; o.nN++; o.items.push({ key: k, kind: 'Novo', d: r.vc, vr: r.vc, vp: null }); if (D.firstYm.get(k) === rYm) o.novFirst++; else o.novBack++; continue; }
+    const d = r.vc - p.vc;
+    if (d > 0) { o.aum += d; o.nA++; o.items.push({ key: k, kind: 'Aumento', d, vr: r.vc, vp: p.vc }); }
+    else if (d < 0) { o.red += d; o.nR++; o.items.push({ key: k, kind: 'Redução', d, vr: r.vc, vp: p.vc }); }
+    else o.nI++;
+  }
+  for (const [k, p] of tp) if (!tr.has(k)) { o.perd -= p.vc; o.nP++; o.items.push({ key: k, kind: 'Perdido', d: -p.vc, vr: null, vp: p.vc }); }
+  o.sum = o.P + o.nov + o.aum + o.red + o.perd;
+  return o;
+}
+/* Recorrentes, novos e perdidos de uma competência em relação à anterior. */
+function dFlow(D, m) {
+  const p = dPrevYm(m); if (!D.tomM.has(p)) return null;
+  const cur = D.tomM.get(m), prev = D.tomM.get(p), o = { act: cur.size, rec: { n: 0, vc: 0 }, nov: { n: 0, vc: 0, back: 0 }, perd: { n: 0, vc: 0 } };
+  for (const [k, t] of cur) { if (prev.has(k)) { o.rec.n++; o.rec.vc += t.vc; } else { o.nov.n++; o.nov.vc += t.vc; if (D.firstYm.get(k) < m) o.nov.back++; } }
+  for (const [k, t] of prev) if (!cur.has(k)) { o.perd.n++; o.perd.vc += t.vc; }
+  return o;
+}
+function dConc(tm) {
+  const arr = [...tm.entries()].map(([k, t]) => ({ key: k, vc: t.vc })).sort((a, b) => b.vc - a.vc || (a.key < b.key ? -1 : 1));
+  const tot = arr.reduce((a, x) => a + x.vc, 0), o = { tot, n: arr.length, top: arr[0] || null, sh: {} };
+  for (const N of DIAG.topN) o.sh[N] = tot > 0 ? arr.slice(0, N).reduce((a, x) => a + x.vc, 0) / tot : null;
+  return o;
+}
+function dFaixas(list) {
+  const e = DIAG.faixas, out = Array.from({ length: e.length + 1 }, () => ({ n: 0, vc: 0 }));
+  for (const n of list) { let i = 0; while (i < e.length && n.vc >= e[i]) i++; out[i].n++; out[i].vc += n.vc; }
+  return out;
+}
+const dFaixaLabel = i => { const e = DIAG.faixas; return i === 0 ? `Menos de ${compact(e[0])}` : i === e.length ? `${compact(e[e.length - 1])} ou mais` : `${compact(e[i - 1])} a menos de ${compact(e[i])}`; };
+function dHeat(D) {
+  const dg = new Set(S.sources.filter(s => s.cols.dgen).map(s => s.name));
+  const cell = Array.from({ length: 7 }, () => Array.from({ length: 31 }, () => ({ vc: 0, n: 0 }))), tot = { vc: 0, n: 0 };
+  let skipped = 0;
+  for (const n of D.dated) {
+    if (!n.date || !dg.has(n.src)) { skipped++; continue; }
+    const wd = new Date(n.date + 'T00:00:00Z').getUTCDay(), d = +n.date.slice(8, 10) - 1, c = cell[wd][d];
+    c.vc += n.vc; c.n++; tot.vc += n.vc; tot.n++;
+  }
+  return { cell, tot, skipped, has: dg.size > 0 };
+}
+function dCancel() {
+  const all = S.notes.filter(n => passes(n, S.F, { noDate: true, noSit: true }) && n.ym), m = new Map();
+  for (const n of all) { let o = m.get(n.ym); if (!o) m.set(n.ym, o = { n: 0, vc: 0, cn: 0, cv: 0 }); o.n++; o.vc += n.vc; if (isCancel(n.sit)) { o.cn++; o.cv += n.vc; } }
+  return { all, m };
+}
+function dAtipicas(D) {
+  const byT = new Map(); for (const n of D.dated) { let a = byT.get(n.tomKey); if (!a) byT.set(n.tomKey, a = []); a.push(n); }
+  const out = [];
+  for (const a of byT.values()) {
+    if (a.length < DIAG.atipicoMinNotas) continue;
+    const med = dPctl(a.map(n => n.vc).sort((x, y) => x - y), 0.5); if (!(med > 0)) continue;
+    const lim = med * DIAG.atipicoMult; for (const n of a) if (n.vc > lim) out.push({ n, med, ratio: n.vc / med });
+  }
+  return out.sort((a, b) => b.ratio - a.ratio);
+}
+function dNumeracao() {
+  const by = new Map();
+  for (const n of S.allNotes) { if (!/^\d+$/.test(n.num)) continue; const v = parseInt(n.num, 10); if (!(v > 0)) continue; let a = by.get(n.emp); if (!a) by.set(n.emp, a = new Set()); a.add(v); }
+  const out = [];
+  for (const [emp, set] of by) {
+    const nums = [...set].sort((a, b) => a - b); if (nums.length < 2) continue;
+    let miss = 0; const ranges = [];
+    for (let i = 1; i < nums.length; i++) { const gap = nums[i] - nums[i - 1] - 1; if (gap > 0) { miss += gap; ranges.push(gap === 1 ? String(nums[i - 1] + 1) : `${nums[i - 1] + 1} a ${nums[i] - 1}`); } }
+    out.push({ emp, nome: (S.companies.find(c => c.emp === emp) || {}).name || fmtCnpj(emp), min: nums[0], max: nums[nums.length - 1], n: nums.length, miss, ranges });
+  }
+  return out.sort((a, b) => b.miss - a.miss);
+}
+function dDuplic(D) {
+  const dg = new Set(S.sources.filter(s => s.cols.dgen).map(s => s.name)), m = new Map();
+  for (const n of D.dated) { if (!n.date || !dg.has(n.src)) continue; const k = [n.emp, n.tomKey, n.date, n.vc].join('|'); let a = m.get(k); if (!a) m.set(k, a = []); a.push(n); }
+  return [...m.values()].filter(a => a.length > 1).sort((a, b) => b[0].vc * b.length - a[0].vc * a.length);
+}
+/* Tabela mensal (ordem cronológica) reaproveitada pela exportação em Excel. */
+function dMonthlyTable(D) {
+  const t = [];
+  for (const m of D.months) {
+    const r = D.rows.get(m), pm = D.rows.get(dPrevYm(m)), ya = D.rows.get(dYearAgo(m)), fl = dFlow(D, m), cc = dConc(r.tm);
+    t.push([fmtComp(m), r.vc / 100, pm ? dVar(r.vc, pm.vc) : null, ya ? dVar(r.vc, ya.vc) : null, D.ytd.get(m) / 100, r.n, r.n ? r.mean / 100 : null, r.n ? r.med / 100 : null, r.ic / 100, r.vc ? r.ic / r.vc : null, r.tom,
+      fl ? fl.rec.n : null, fl ? fl.nov.n : null, fl ? fl.perd.n : null, fl ? fl.rec.vc / 100 : null, fl ? fl.nov.vc / 100 : null, fl ? fl.perd.vc / 100 : null, ...DIAG.topN.map(N => cc.sh[N])]);
+  }
+  const h = ['Competência', 'Faturamento', 'Var. sobre mês anterior', 'Var. sobre mesmo mês do ano anterior', 'Acumulado no ano', 'NFS-e', 'Ticket médio', 'Mediana da nota', 'ISSQN', 'ISSQN ÷ Faturamento', 'Tomadores ativos',
+    'Tomadores recorrentes', 'Tomadores novos', 'Tomadores perdidos', 'Faturamento recorrentes', 'Faturamento novos', 'Faturamento perdidos (mês anterior)', ...DIAG.topN.map(N => 'Top ' + N)];
+  const ty = ['text', 'money', 'pct', 'pct', 'money', 'int', 'money', 'money', 'money', 'pct', 'int', 'int', 'int', 'int', 'money', 'money', 'money', ...DIAG.topN.map(() => 'pct')];
+  return { h, rows: t, t: ty, w: h.map((x, i) => i === 0 ? 13 : 18) };
+}
+
+/* ---------- apresentação ---------- */
+const dMoney = c => (c === null || c === undefined) ? '—' : money(Math.round(c));
+const dTom = k => esc((S.tom.get(k) || {}).label || k);
+const dVarHtml = v => v === null ? '<span class="muted">—</span>' : `<span class="${v > 0 ? 'pos' : v < 0 ? 'neg' : 'muted'}">${signed(v, x => pct(x))}</span>`;
+const dDeltaHtml = d => d === 0 ? '<span class="muted">R$ 0,00</span>' : `<span class="${d > 0 ? 'pos' : 'neg'}">${signed(d, x => money(x))}</span>`;
+const dSub = (v, sub) => `${v}<div class="muted text-xs">${sub}</div>`;
+const dCard = (title, sub, body, extra) => `<div class="card"><div class="card-h"><div class="min-w-0"><h3 class="t-title">${title}</h3>${sub ? `<p class="t-sub">${sub}</p>` : ''}</div>${extra || ''}</div><div class="card-b !px-0 !pb-0">${body}</div></div>`;
+const dEmptyMsg = msg => `<p class="muted g-empty">${msg}</p>`;
+const dBadge = k => `<span class="badge ${{ Novo: 'b-info', Aumento: 'b-pos', 'Redução': 'b-amber', Perdido: 'b-neg' }[k] || 'b-mute'}">${k}</span>`;
+const dKpi = (l, v, s, cls) => `<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v ${cls || ''}">${v}</div><div class="kpi-s">${s}</div></div>`;
+const dVarCls = v => v === null ? 'muted' : v > 0 ? 'pos' : v < 0 ? 'neg' : '';
+
+function dContext(D) {
+  if (!S.D) S.D = { sec: 'cresc', ref: '', cmp: 'mom' };
+  const st = S.D; if (!D.months.includes(st.ref)) st.ref = D.months[D.months.length - 1];
+  const ref = st.ref, cmpYm = st.cmp === 'yoy' ? dYearAgo(ref) : dPrevYm(ref);
+  return { st, ref, rr: D.rows.get(ref), cmp: st.cmp, cmpYm, cr: D.rows.get(cmpYm) || null };
+}
+const dCmpName = X => X.cmp === 'yoy' ? 'mesmo mês do ano anterior' : 'mês anterior';
+
+/* --- Crescimento --- */
+function dSecCresc(D, X) {
+  const th = theme(), { ref, rr } = X, rows = D.rows;
+  const prevYm = dPrevYm(ref), yoyYm = dYearAgo(ref), pr = rows.get(prevYm), yr = rows.get(yoyYm);
+  const varKpi = (row, ym, label) => {
+    if (!row) return dKpi(label, '—', `${fmtComp(ym)} não está na base carregada.`, 'muted');
+    const v = dVar(rr.vc, row.vc), d = rr.vc - row.vc;
+    return dKpi(label, v === null ? '—' : signed(v, x => pct(x)), row.vc ? `${money(row.vc)} em ${fmtComp(ym)}. Diferença ${d === 0 ? money(0) : signed(d, x => money(x))}.` : `Sem faturamento em ${fmtComp(ym)} no filtro atual.`, dVarCls(v));
+  };
+  const y = ref.slice(0, 4), sumRange = (a, b) => D.months.filter(m => m >= a && m <= b).reduce((s, m) => s + rows.get(m).vc, 0);
+  const ytdNow = D.ytd.get(ref), pyOk = D.months[0] <= (+y - 1) + '-01', pyYtd = pyOk ? sumRange((+y - 1) + '-01', dYearAgo(ref)) : null, ytdV = pyOk ? dVar(ytdNow, pyYtd) : null;
+  const ytdSub = pyOk ? `Mesmo período de ${+y - 1}: ${money(pyYtd)}${ytdV === null ? '' : ' (' + signed(ytdV, x => pct(x)) + ')'}.` : (D.months[0] > y + '-01' ? `A base começa em ${fmtComp(D.months[0])}: acumulado parcial.` : `Sem base de ${+y - 1} para comparar.`);
+  const full = D.inc ? D.months.filter(m => m !== D.inc.ym) : D.months;
+  let avgK;
+  if (full.length) {
+    const tot = full.reduce((s, m) => s + rows.get(m).vc, 0), srt = [...full].sort((a, b) => rows.get(b).vc - rows.get(a).vc), best = srt[0], worst = srt[srt.length - 1];
+    avgK = dKpi('Média mensal', money(Math.round(tot / full.length)), `${NUM.format(full.length)} ${full.length === 1 ? 'competência' : 'competências'}${D.inc ? ', sem ' + fmtComp(D.inc.ym) + ' (possivelmente incompleta)' : ''}.<br>Melhor: ${fmtComp(best)}, ${money(rows.get(best).vc)}.<br>Pior: ${fmtComp(worst)}, ${money(rows.get(worst).vc)}.`);
+  } else avgK = dKpi('Média mensal', '—', 'Só há uma competência, possivelmente incompleta.', 'muted');
+  const kpis = `<div class="card kpis kn" style="--kc:5">
+    ${dKpi('Faturamento de ' + fmtComp(ref), money(rr.vc), `${NUM.format(rr.n)} NFS-e, ${NUM.format(rr.tom)} tomadores. Ticket médio ${rr.n ? money(Math.round(rr.mean)) : '—'}.`)}
+    ${varKpi(pr, prevYm, 'Sobre o mês anterior')}${varKpi(yr, yoyYm, 'Sobre o mesmo mês do ano anterior')}
+    ${dKpi('Acumulado em ' + y, money(ytdNow), ytdSub)}${avgK}</div>`;
+
+  /* evolução */
+  const labels = D.months.map(fmtComp);
+  const evoRows = [...D.months].reverse().map(m => {
+    const r = rows.get(m), pm = rows.get(dPrevYm(m)), ya = rows.get(dYearAgo(m));
+    return `<tr class="${m === ref ? 'dg-hl' : ''}"><td class="font-medium">${fmtComp(m)}${D.inc && D.inc.ym === m ? ' <span class="badge b-amber" title="Possivelmente incompleta: ' + esc(D.inc.why) + '">incompleta?</span>' : ''}</td><td class="r">${money(r.vc)}</td><td class="r">${dVarHtml(pm ? dVar(r.vc, pm.vc) : null)}</td><td class="r">${dVarHtml(ya ? dVar(r.vc, ya.vc) : null)}</td><td class="r">${money(D.ytd.get(m))}</td><td class="r">${NUM.format(r.n)}</td><td class="r">${r.n ? money(Math.round(r.mean)) : '—'}</td><td class="r">${r.n ? money(Math.round(r.med)) : '—'}</td><td class="r">${money(r.ic)}</td><td class="r">${r.vc ? pct(r.ic / r.vc, 2) : '—'}</td><td class="r">${NUM.format(r.tom)}</td></tr>`;
+  }).join('');
+  const tAll = summarize(D.dated);
+  const evoTbl = `<div class="scroll-y scroll-x" style="max-height:420px"><table class="tbl compact"><thead><tr><th>Competência</th><th class="r">Faturamento</th><th class="r">Sobre mês anterior</th><th class="r">Sobre mesmo mês do ano anterior</th><th class="r">Acumulado no ano</th><th class="r">NFS-e</th><th class="r">Ticket médio</th><th class="r">Mediana da nota</th><th class="r">ISSQN</th><th class="r">ISSQN ÷ Fat.</th><th class="r">Tomadores</th></tr></thead><tbody>${evoRows}</tbody>
+    <tfoot><tr><td>Total</td><td class="r">${money(tAll.vc)}</td><td></td><td></td><td></td><td class="r">${NUM.format(tAll.n)}</td><td class="r">${tAll.n ? money(Math.round(tAll.vc / tAll.n)) : '—'}</td><td></td><td class="r">${money(tAll.ic)}</td><td class="r">${tAll.vc ? pct(tAll.ic / tAll.vc, 2) : '—'}</td><td class="r">${NUM.format(tAll.tom)}</td></tr></tfoot></table></div>
+    <p class="dg-note">Variação = (competência − comparação) ÷ comparação. O acumulado reinicia em janeiro${D.months[0].slice(5) !== '01' ? `; no primeiro ano ele começa em ${fmtComp(D.months[0])}, que é onde a base começa` : ''}. Competência sem NFS-e no filtro conta como R$ 0,00.</p>`;
+  const evoCard = dCard('Faturamento por competência', `Vlr. Serviço. A competência de referência (${fmtComp(ref)}) está destacada.`, `<div style="padding:0 16px 12px"><div class="chart-box"><canvas id="c-dg-evo" role="img" aria-label="Faturamento por competência"></canvas></div></div>${evoTbl}`);
+
+  /* ponte */
+  let bridgeHtml, drawBridge = null; const cr = X.cr, cmpYm = X.cmpYm;
+  const seg = `<div class="seg no-print" role="group" aria-label="Comparar com"><button data-action="d-cmp" data-v="mom" aria-pressed="${X.cmp === 'mom'}">Mês anterior</button><button data-action="d-cmp" data-v="yoy" aria-pressed="${X.cmp === 'yoy'}">Mesmo mês do ano anterior</button></div>`;
+  if (!cr) {
+    bridgeHtml = dCard(`O que explica a variação de ${fmtComp(ref)}`, '', dEmptyMsg(`${fmtComp(cmpYm)} não está na base carregada, então não há comparação por ${X.cmp === 'yoy' ? 'ano' : 'mês'}.`), seg);
+  } else {
+    const B = dBridge(D, ref, cmpYm), dif = B.R - B.P;
+    const line = (lab, n, v, tot) => `<tr><td>${lab}</td><td class="r">${n === null ? '' : NUM.format(n)}</td><td class="r">${tot ? money(v) : dDeltaHtml(v)}</td><td class="r">${tot || !B.P ? '' : dVarHtml(v / Math.abs(B.P))}</td></tr>`;
+    const tblB = `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Etapa</th><th class="r">Tomadores</th><th class="r">Valor</th><th class="r">% de ${fmtComp(cmpYm)}</th></tr></thead><tbody>
+      ${line('Faturamento ' + fmtComp(cmpYm), cr.tom, B.P, true)}${line('Novos (sem NFS-e em ' + fmtComp(cmpYm) + ')', B.nN, B.nov)}${line('Aumentos', B.nA, B.aum)}${line('Reduções', B.nR, B.red)}${line('Perdidos (sem NFS-e em ' + fmtComp(ref) + ')', B.nP, B.perd)}
+      </tbody><tfoot><tr><td>Faturamento ${fmtComp(ref)}</td><td class="r">${NUM.format(rr.tom)}</td><td class="r">${money(B.R)}</td><td class="r">${B.P ? dVarHtml(dif / Math.abs(B.P)) : ''}</td></tr></tfoot></table></div>
+      <p class="dg-note">Diferença total: ${dif === 0 ? money(0) : signed(dif, x => money(x))}. ${NUM.format(B.nI)} ${B.nI === 1 ? 'tomador manteve' : 'tomadores mantiveram'} o mesmo valor.${B.nN ? ` Entre os novos: ${NUM.format(B.novFirst)} com a primeira NFS-e do período carregado em ${fmtComp(ref)}; ${NUM.format(B.novBack)} que já tinham NFS-e em competências anteriores.` : ''}</p>`;
+    const steps = [], s0 = B.P, s1 = s0 + B.nov, s2 = s1 + B.aum, s3 = s2 + B.red, s4 = s3 + B.perd;
+    steps.push({ l: 'Faturamento ' + fmtComp(cmpYm), a: 0, b: B.P, c: th.brand, tip: money(B.P) });
+    steps.push({ l: 'Novos', a: s0, b: s1, c: cssv('--pos'), tip: `${signed(B.nov, x => money(x))}, ${NUM.format(B.nN)} tomadores` });
+    steps.push({ l: 'Aumentos', a: s1, b: s2, c: cssv('--pos'), tip: `${signed(B.aum, x => money(x))}, ${NUM.format(B.nA)} tomadores` });
+    steps.push({ l: 'Reduções', a: s2, b: s3, c: cssv('--neg'), tip: `${signed(B.red, x => money(x))}, ${NUM.format(B.nR)} tomadores` });
+    steps.push({ l: 'Perdidos', a: s3, b: s4, c: cssv('--neg'), tip: `${signed(B.perd, x => money(x))}, ${NUM.format(B.nP)} tomadores` });
+    steps.push({ l: 'Faturamento ' + fmtComp(ref), a: 0, b: B.R, c: th.brand, tip: money(B.R) });
+    drawBridge = () => drawChart('c-dg-ponte', { type: 'bar', data: { labels: steps.map(s => s.l), datasets: [{ data: steps.map(s => [Math.min(s.a, s.b) / 100, Math.max(s.a, s.b) / 100]), backgroundColor: steps.map(s => s.c), maxBarThickness: 64 }] },
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: S.printing ? 0 : 250 },
+        scales: { x: { grid: { display: false }, ticks: { color: th.muted, maxRotation: 0 } }, y: { beginAtZero: true, border: { display: false }, grid: { color: th.grid }, ticks: { color: th.muted, callback: v => compact(v * 100) } } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => steps[c.dataIndex].tip } } } } });
+    const pos = B.items.filter(i => i.d > 0).sort((a, b) => b.d - a.d), neg = B.items.filter(i => i.d < 0).sort((a, b) => a.d - b.d);
+    const mv = (arr, title, sub) => {
+      const top = arr.slice(0, 8), rest = arr.slice(8), rs = rest.reduce((a, i) => a + i.d, 0), all = arr.reduce((a, i) => a + i.d, 0);
+      const body = arr.length ? `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Tomador</th><th>Tipo</th><th class="r">${fmtComp(cmpYm)}</th><th class="r">${fmtComp(ref)}</th><th class="r">Variação</th></tr></thead><tbody>${top.map(i => `<tr><td class="wrap font-medium" title="${dTom(i.key)}">${esc(trunc((S.tom.get(i.key) || {}).label || i.key, 44))}</td><td>${dBadge(i.kind)}</td><td class="r">${i.vp === null ? '<span class="muted">—</span>' : money(i.vp)}</td><td class="r">${i.vr === null ? '<span class="muted">—</span>' : money(i.vr)}</td><td class="r">${dDeltaHtml(i.d)}</td></tr>`).join('')}${rest.length ? `<tr><td class="muted" colspan="4">Demais ${NUM.format(rest.length)} tomadores</td><td class="r">${dDeltaHtml(rs)}</td></tr>` : ''}</tbody><tfoot><tr><td colspan="4">Total (${NUM.format(arr.length)} tomadores)</td><td class="r">${dDeltaHtml(all)}</td></tr></tfoot></table></div>` : dEmptyMsg('Nenhum tomador nesta situação.');
+      return dCard(title, sub, body);
+    };
+    bridgeHtml = `${dCard(`O que explica a variação de ${fmtComp(ref)}`, `Contra ${dCmpName(X)} (${fmtComp(cmpYm)}), tomador por tomador. Novos, aumentos, reduções e perdidos somam exatamente a diferença de faturamento.`, `<div class="dg-2" style="padding:0 16px 14px"><div><div class="chart-box" style="height:300px"><canvas id="c-dg-ponte" role="img" aria-label="Ponte de faturamento"></canvas></div></div><div>${tblB}</div></div>`, seg)}
+      <div class="dg-2">${mv(pos, 'Maiores altas', 'Tomadores novos e com aumento de faturamento.')}${mv(neg, 'Maiores quedas', 'Tomadores com redução e os que deixaram de faturar.')}</div>`;
+  }
+  const head = `<div><h2 class="t-title">Crescimento</h2><p class="t-sub">Competência de referência: ${fmtComp(ref)}. Faturamento = soma do Vlr. Serviço.</p></div>`;
+  return { html: `${head}${kpis}${evoCard}${bridgeHtml}`, draw: () => {
+    drawChart('c-dg-evo', { type: 'bar', data: { labels, datasets: [{ data: D.months.map(m => rows.get(m).vc / 100), backgroundColor: D.months.map(m => m === ref ? th.brand : alpha(th.brand, D.inc && D.inc.ym === m ? 0.25 : 0.5)), maxBarThickness: 44 }] },
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: S.printing ? 0 : 250 }, interaction: { mode: 'index', intersect: false },
+        scales: { x: { grid: { display: false }, ticks: { color: th.muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } }, y: { beginAtZero: true, border: { display: false }, grid: { color: th.grid }, ticks: { color: th.muted, callback: v => compact(v * 100) } } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'Faturamento: ' + BRL.format(c.parsed.y), afterLabel: c => { const m = D.months[c.dataIndex], pm = rows.get(dPrevYm(m)), ya = rows.get(dYearAgo(m)), r = rows.get(m), o = []; if (pm) o.push('Sobre o mês anterior: ' + (dVar(r.vc, pm.vc) === null ? '—' : signed(dVar(r.vc, pm.vc), x => pct(x)))); if (ya) o.push('Sobre o mesmo mês do ano anterior: ' + (dVar(r.vc, ya.vc) === null ? '—' : signed(dVar(r.vc, ya.vc), x => pct(x)))); return o; } } } } } });
+    if (drawBridge) drawBridge();
+  } };
+}
+
+/* --- Carteira --- */
+function dSecCart(D, X) {
+  const { ref } = X, rows = D.rows;
+  const flowRows = [...D.months].reverse().map(m => {
+    const f = dFlow(D, m), r = rows.get(m), cls = m === ref ? 'dg-hl' : '';
+    if (!f) return `<tr class="${cls}"><td class="font-medium">${fmtComp(m)}</td><td class="r">${NUM.format(r.tom)}</td><td class="r muted" colspan="4" title="Sem competência anterior na base">—</td></tr>`;
+    return `<tr class="${cls}"><td class="font-medium">${fmtComp(m)}</td><td class="r">${NUM.format(f.act)}</td>
+      <td class="r">${dSub(money(f.rec.vc), NUM.format(f.rec.n) + (f.rec.n === 1 ? ' tomador' : ' tomadores') + (r.vc ? ', ' + pct(f.rec.vc / r.vc) + ' do faturamento' : ''))}</td>
+      <td class="r">${dSub(money(f.nov.vc), NUM.format(f.nov.n) + (f.nov.n === 1 ? ' tomador' : ' tomadores') + (f.nov.n ? `, ${NUM.format(f.nov.back)} ${f.nov.back === 1 ? 'já tinha' : 'já tinham'} NFS-e antes` : ''))}</td>
+      <td class="r">${dSub(money(f.perd.vc), NUM.format(f.perd.n) + (f.perd.n === 1 ? ' tomador' : ' tomadores') + ' (valor do mês anterior)')}</td></tr>`;
+  }).join('');
+  const flowCard = dCard('Novos, recorrentes e perdidos', 'Cada competência contra a anterior. Recorrente: teve NFS-e nas duas. Novo: teve NFS-e nesta e não na anterior. Perdido: teve na anterior e não nesta.',
+    `<div class="scroll-y scroll-x" style="max-height:460px"><table class="tbl compact"><thead><tr><th>Competência</th><th class="r">Tomadores ativos</th><th class="r">Recorrentes</th><th class="r">Novos</th><th class="r">Perdidos</th></tr></thead><tbody>${flowRows}</tbody></table></div>
+    <p class="dg-note">Faturamento de recorrentes + novos = faturamento da competência. “Já tinham NFS-e antes” são tomadores novos no mês, mas que apareceram em competências anteriores do período carregado. A primeira competência não tem anterior para comparar.</p>`);
+  const concCell = (c, N) => { const v = c.sh[N]; return v === null ? '<span class="muted">—</span>' : (c.n <= N ? `<span class="muted" title="Todos os ${NUM.format(c.n)} tomadores ativos">${pct(v)}</span>` : pct(v)); };
+  const concRow = (lab, c, cls) => `<tr class="${cls || ''}"><td class="font-medium">${lab}</td><td class="r">${NUM.format(c.n)}</td><td class="wrap" title="${c.top ? dTom(c.top.key) : ''}">${c.top ? `${esc(trunc((S.tom.get(c.top.key) || {}).label || c.top.key, 34))} <span class="muted">${c.tot > 0 ? pct(c.top.vc / c.tot) : ''}</span>` : '<span class="muted">—</span>'}</td>${DIAG.topN.map(N => `<td class="r">${concCell(c, N)}</td>`).join('')}</tr>`;
+  const tmAll = new Map(); for (const m of D.months) for (const [k, t] of D.tomM.get(m)) { let a = tmAll.get(k); if (!a) tmAll.set(k, a = { vc: 0, n: 0 }); a.vc += t.vc; a.n += t.n; }
+  const concBody = concRow(`Todas as competências <span class="muted">(${NUM.format(D.months.length)})</span>`, dConc(tmAll)) + [...D.months].reverse().map(m => concRow(fmtComp(m), dConc(rows.get(m).tm), m === ref ? 'dg-hl' : '')).join('');
+  const concCard = dCard('Concentração por tomador', 'Participação dos maiores tomadores no faturamento da competência.',
+    `<div class="scroll-y scroll-x" style="max-height:460px"><table class="tbl compact"><thead><tr><th>Competência</th><th class="r">Tomadores ativos</th><th>Maior tomador</th>${DIAG.topN.map(N => `<th class="r">Top ${N}</th>`).join('')}</tr></thead><tbody>${concBody}</tbody></table></div>
+    <p class="dg-note">Top N = soma dos N maiores tomadores ÷ faturamento da competência. Percentuais em cinza indicam que o Top N já inclui todos os tomadores ativos.</p>`);
+  return { html: `<div><h2 class="t-title">Carteira de tomadores</h2><p class="t-sub">Tomador = CPF/CNPJ (ou o nome, se não houver documento). Respeita os filtros atuais, menos as datas.</p></div>${flowCard}${concCard}`, draw: null };
+}
+
+/* --- Composição --- */
+function dSecComp(D, X) {
+  const { ref, rr, cr, cmpYm } = X, nm = dCmpName(X);
+  const seg = `<div class="seg no-print" role="group" aria-label="Comparar com"><button data-action="d-cmp" data-v="mom" aria-pressed="${X.cmp === 'mom'}">Mês anterior</button><button data-action="d-cmp" data-v="yoy" aria-pressed="${X.cmp === 'yoy'}">Mesmo mês do ano anterior</button></div>`;
+  const cv = f => cr ? f(cr) : null;
+  const tk = [['NFS-e', r => r.n, 'int'], ['Faturamento', r => r.vc, 'money'], ['Ticket médio por NFS-e (faturamento ÷ NFS-e)', r => r.mean, 'money'], ['Mediana da nota', r => r.med, 'money'], ['1º quartil (25%)', r => r.p25, 'money'], ['3º quartil (75%)', r => r.p75, 'money'],
+    ['Maior nota', r => r.n ? r.max : null, 'money'], ['Menor nota', r => r.n ? r.min : null, 'money'], ['Tomadores ativos', r => r.tom, 'int'], ['Ticket médio por tomador (faturamento ÷ tomadores)', r => r.tom ? r.vc / r.tom : null, 'money']];
+  const fm = (v, t) => v === null || v === undefined ? '<span class="muted">—</span>' : t === 'int' ? NUM.format(v) : dMoney(v);
+  const tkRows = tk.map(([l, f, t]) => { const a = f(rr), b = cv(f); return `<tr><td>${l}</td><td class="r">${fm(a, t)}</td><td class="r">${fm(b, t)}</td><td class="r">${dVarHtml(dVar(a, b))}</td></tr>`; }).join('');
+  const tkCard = dCard('Ticket', `${fmtComp(ref)} contra ${nm}${cr ? ' (' + fmtComp(cmpYm) + ')' : ''}.`, `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Indicador</th><th class="r">${fmtComp(ref)}</th><th class="r">${cr ? fmtComp(cmpYm) : 'Comparação'}</th><th class="r">Variação</th></tr></thead><tbody>${tkRows}</tbody></table></div>
+    <p class="dg-note">Quartis por interpolação linear (igual ao PERCENTIL.INC do Excel). ${cr ? '' : `${fmtComp(cmpYm)} não está na base carregada.`}</p>`, seg);
+  const fa = dFaixas(rr.list), fb = cr ? dFaixas(cr.list) : null, maxS = Math.max(0, ...fa.map(x => rr.vc > 0 ? x.vc / rr.vc : 0));
+  const fxRows = fa.map((x, i) => { const y = fb ? fb[i] : null, sa = rr.vc > 0 ? x.vc / rr.vc : null, sb = y && cr.vc > 0 ? y.vc / cr.vc : null;
+    return `<tr><td>${dFaixaLabel(i)}</td><td class="r">${NUM.format(x.n)}</td><td class="r">${money(x.vc)}</td><td class="r">${sa === null ? '—' : dSub(pct(sa), `<div class="g-bar"><span style="width:${maxS ? Math.round(100 * sa / maxS) : 0}%"></span></div>`)}</td><td class="r">${y ? NUM.format(y.n) : '—'}</td><td class="r">${y ? money(y.vc) : '—'}</td><td class="r">${sb === null ? '—' : pct(sb)}</td></tr>`; }).join('');
+  const fxCard = dCard('NFS-e por faixa de valor', `Quantas notas, e quanto do faturamento, em cada faixa. 1.000 notas de R$ 1 mil e 100 notas de R$ 10 mil somam o mesmo valor, mas são carteiras diferentes.`,
+    `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Faixa do valor da nota</th><th class="r">NFS-e ${fmtComp(ref)}</th><th class="r">Faturamento</th><th class="r">% do fat.</th><th class="r">NFS-e ${cr ? fmtComp(cmpYm) : ''}</th><th class="r">Faturamento</th><th class="r">% do fat.</th></tr></thead><tbody>${fxRows}</tbody><tfoot><tr><td>Total</td><td class="r">${NUM.format(rr.n)}</td><td class="r">${money(rr.vc)}</td><td></td><td class="r">${cr ? NUM.format(cr.n) : '—'}</td><td class="r">${cr ? money(cr.vc) : '—'}</td><td></td></tr></tfoot></table></div>`);
+  let mixCard;
+  if (!hasCat()) mixCard = dCard('Mix por tipo de serviço', '', dEmptyMsg('Para o mix, a planilha precisa trazer a Operação ou o código/descrição do serviço.'));
+  else {
+    const ga = new Map(groupBy(rr.list, n => n.cat).map(g => [g.key, g])), gb = new Map(cr ? groupBy(cr.list, n => n.cat).map(g => [g.key, g]) : []);
+    const keys = [...new Set([...ga.keys(), ...gb.keys()])].sort((a, b) => ((ga.get(b) || {}).vc || 0) - ((ga.get(a) || {}).vc || 0));
+    const mxRows = keys.map(k => { const a = (ga.get(k) || { vc: 0 }).vc, b = cr ? (gb.get(k) || { vc: 0 }).vc : null, pa = rr.vc > 0 ? a / rr.vc : null, pb = cr && cr.vc > 0 ? b / cr.vc : null, pp = (pa !== null && pb !== null) ? (pa - pb) * 100 : null;
+      return `<tr><td class="font-medium">${esc(k)}</td><td class="r">${money(a)}</td><td class="r">${pa === null ? '—' : pct(pa)}</td><td class="r">${b === null ? '—' : money(b)}</td><td class="r">${pb === null ? '—' : pct(pb)}</td><td class="r">${pp === null ? '—' : `<span class="${pp > 0 ? 'pos' : pp < 0 ? 'neg' : 'muted'}">${signed(pp, x => x.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' p.p.')}</span>`}</td><td class="r">${b === null ? '—' : dDeltaHtml(a - b)}</td></tr>`; }).join('');
+    mixCard = dCard('Mix por tipo de serviço', `Participação de cada tipo no faturamento, ${fmtComp(ref)} contra ${nm}${cr ? ' (' + fmtComp(cmpYm) + ')' : ''}.`, `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Tipo de serviço</th><th class="r">${fmtComp(ref)}</th><th class="r">% do fat.</th><th class="r">${cr ? fmtComp(cmpYm) : 'Comparação'}</th><th class="r">% do fat.</th><th class="r">Mudança de mix</th><th class="r">Variação em R$</th></tr></thead><tbody>${mxRows}</tbody><tfoot><tr><td>Total</td><td class="r">${money(rr.vc)}</td><td></td><td class="r">${cr ? money(cr.vc) : '—'}</td><td></td><td></td><td class="r">${cr ? dDeltaHtml(rr.vc - cr.vc) : '—'}</td></tr></tfoot></table></div>
+      <p class="dg-note">A mudança de mix é a diferença de participação, em pontos percentuais. A variação em R$ mostra quanto de cada tipo explica a diferença de faturamento.</p>`);
+  }
+  return { html: `<div><h2 class="t-title">Composição do faturamento</h2><p class="t-sub">Competência de referência: ${fmtComp(ref)}, comparada ao ${nm}.</p></div><div class="dg-2">${tkCard}${fxCard}</div>${mixCard}`, draw: null };
+}
+
+/* --- Tributos --- */
+function dSecTrib(D, X) {
+  const { ref, rr } = X, rows = D.rows, tx = TAXES.slice(1).filter(x => S.avail.tax[x.k]);
+  const gr = groupBy(rr.list, n => n.ret).sort((a, b) => b.vc - a.vc);
+  const rtRows = gr.map(g => `<tr><td class="font-medium">${esc(g.key)}</td><td class="r">${NUM.format(g.n)}</td><td class="r">${money(g.vc)}</td><td class="r">${rr.vc ? pct(g.vc / rr.vc) : '—'}</td><td class="r">${money(g.ic)}</td><td class="r">${rr.ic ? pct(g.ic / rr.ic) : '—'}</td><td class="r">${g.vc ? pct(g.ic / g.vc, 2) : '—'}</td></tr>`).join('');
+  const retCard = dCard(`ISSQN por retenção em ${fmtComp(ref)}`, 'Os rótulos são exatamente os da coluna ISS Retido da planilha; o dashboard não interpreta qual deles significa retido.',
+    `<div class="scroll-x">${gr.length ? `<table class="tbl compact"><thead><tr><th>Retenção ISSQN</th><th class="r">NFS-e</th><th class="r">Faturamento</th><th class="r">% do fat.</th><th class="r">ISSQN</th><th class="r">% do ISSQN</th><th class="r">ISSQN ÷ Fat.</th></tr></thead><tbody>${rtRows}</tbody><tfoot><tr><td>Total</td><td class="r">${NUM.format(rr.n)}</td><td class="r">${money(rr.vc)}</td><td></td><td class="r">${money(rr.ic)}</td><td></td><td class="r">${rr.vc ? pct(rr.ic / rr.vc, 2) : '—'}</td></tr></tfoot></table>` : dEmptyMsg('Sem NFS-e nesta competência.')}</div>`);
+  const wRows = [...D.months].reverse().map(m => {
+    const r = rows.get(m), pm = rows.get(dPrevYm(m));
+    return `<tr class="${m === ref ? 'dg-hl' : ''}"><td class="font-medium">${fmtComp(m)}</td><td class="r">${money(r.vc)}</td><td class="r">${dVarHtml(pm ? dVar(r.vc, pm.vc) : null)}</td><td class="r">${dVarHtml(pm ? dVar(r.ic, pm.ic) : null)}</td><td class="r" title="${money(r.ic)}">${r.vc ? pct(r.ic / r.vc, 2) : '—'}</td>${tx.map(x => `<td class="r" title="${money(r[x.k])}">${r.vc ? pct(r[x.k] / r.vc, 2) : '—'}</td>`).join('')}</tr>`;
+  }).join('');
+  const wCard = dCard('Peso dos tributos no faturamento', 'Cada tributo informado na NFS-e dividido pelo faturamento da competência. Passe o mouse sobre o percentual para ver o valor em R$.',
+    `<div class="scroll-y scroll-x" style="max-height:460px"><table class="tbl compact"><thead><tr><th>Competência</th><th class="r">Faturamento</th><th class="r">Var. faturamento</th><th class="r">Var. ISSQN</th><th class="r">ISSQN ÷ Fat.</th>${tx.map(x => `<th class="r">${x.short} ÷ Fat.</th>`).join('')}</tr></thead><tbody>${wRows}</tbody></table></div>
+    <p class="dg-note">As variações são sobre o mês anterior. Quando o ISSQN cresce mais que o faturamento, a razão ISSQN ÷ Fat. sobe.${tx.length ? '' : ' Esta planilha não traz tributos além do ISSQN.'}</p>`);
+  return { html: `<div><h2 class="t-title">Tributos</h2><p class="t-sub">Valores informados nas NFS-e. Não há cálculo de tributos novo: só razões entre colunas da planilha.</p></div>${retCard}${wCard}`, draw: null };
+}
+
+/* --- Padrões --- */
+function dSecPad(D, X) {
+  const th = theme(), H = dHeat(D);
+  const head = `<div><h2 class="t-title">Padrões de emissão</h2><p class="t-sub">Por Data de Emissão, em todas as competências carregadas. Respeita os filtros atuais, menos as datas.</p></div>`;
+  if (!H.has) return { html: head + dCard('Quando as NFS-e são emitidas', '', dEmptyMsg('A planilha não tem a coluna Data de Emissão, então não dá para analisar o dia da emissão.')), draw: null };
+  if (!H.tot.n) return { html: head + dCard('Quando as NFS-e são emitidas', '', dEmptyMsg('Nenhuma NFS-e com Data de Emissão no filtro atual.')), draw: null };
+  const dk = c => { const v = Math.abs(c) / 100; return v >= 1e6 ? (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi' : v >= 1e3 ? Math.round(v / 1e3).toLocaleString('pt-BR') + ' mil' : Math.round(v).toLocaleString('pt-BR'); };
+  const mx = Math.max(0, ...H.cell.flat().map(c => c.vc)), dayTot = Array.from({ length: 31 }, (_, d) => H.cell.reduce((a, r) => ({ vc: a.vc + r[d].vc, n: a.n + r[d].n }), { vc: 0, n: 0 }));
+  const wdTot = D_WD.map(w => H.cell[w].reduce((a, c) => ({ vc: a.vc + c.vc, n: a.n + c.n }), { vc: 0, n: 0 }));
+  const hRows = D_WD.map((w, i) => `<tr><th class="rowh">${D_WDN[i]}</th>${H.cell[w].map((c, d) => c.n ? `<td style="background:${alpha(th.brand, 0.1 + 0.6 * (mx > 0 && c.vc > 0 ? c.vc / mx : 0))}" title="${D_WDN[i]}, dia ${d + 1}: ${money(c.vc)} em ${NUM.format(c.n)} NFS-e">${dk(c.vc)}</td>` : '<td class="z">·</td>').join('')}<td class="t">${money(wdTot[i].vc)}</td></tr>`).join('');
+  const heat = `<div class="scroll-x" style="padding:0 16px 12px"><table class="dg-heat"><thead><tr><th></th>${Array.from({ length: 31 }, (_, d) => `<th>${d + 1}</th>`).join('')}<th>Total</th></tr></thead><tbody>${hRows}</tbody>
+    <tfoot><tr><th class="rowh">Total</th>${dayTot.map(c => `<td class="t" style="text-align:center;font-weight:500" title="${NUM.format(c.n)} NFS-e">${c.n ? dk(c.vc) : '·'}</td>`).join('')}<td class="t">${money(H.tot.vc)}</td></tr></tfoot></table></div>
+    <p class="dg-note">Colunas: dia do mês. Linhas: dia da semana. Valores em R$ (mil = milhares); a cor é proporcional ao maior valor. Passe o mouse para ver o valor exato e a quantidade de NFS-e.${H.skipped ? ` ${NUM.format(H.skipped)} NFS-e sem Data de Emissão ficam fora desta aba.` : ''}</p>`;
+  const wdRows = D_WD.map((w, i) => `<tr><td>${D_WDN[i]}</td><td class="r">${NUM.format(wdTot[i].n)}</td><td class="r">${money(wdTot[i].vc)}</td><td class="r">${H.tot.vc > 0 ? pct(wdTot[i].vc / H.tot.vc) : '—'}</td></tr>`).join('');
+  const bands = [['Dias 1 a 10', 0, 10], ['Dias 11 a 20', 10, 20], ['Dias 21 ao fim do mês', 20, 31]].map(([l, a, b]) => { const s = dayTot.slice(a, b).reduce((x, c) => ({ vc: x.vc + c.vc, n: x.n + c.n }), { vc: 0, n: 0 }); return `<tr><td>${l}</td><td class="r">${NUM.format(s.n)}</td><td class="r">${money(s.vc)}</td><td class="r">${H.tot.vc > 0 ? pct(s.vc / H.tot.vc) : '—'}</td></tr>`; }).join('');
+  const tbl = (first, body) => `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>${first}</th><th class="r">NFS-e</th><th class="r">Faturamento</th><th class="r">% do fat.</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  return { html: `${head}${dCard('Dia da semana × dia do mês', 'Faturamento por Data de Emissão.', heat)}<div class="dg-2">${dCard('Por dia da semana', '', tbl('Dia', wdRows))}${dCard('Por parte do mês', 'Mostra se a emissão se concentra no começo, no meio ou no fim do mês.', tbl('Período', bands))}</div>`, draw: null };
+}
+
+/* --- Alertas --- */
+function dAlerts(D, X) {
+  const { ref, rr } = X, out = [], at = dAtipicas(D), atR = at.filter(a => a.n.ym === ref), cn = dCancel(), num = dNumeracao(), du = dDuplic(D);
+  const dupN = du.reduce((a, g) => a + g.length, 0);
+  const cr = cn.m.get(ref), others = [...cn.m.entries()].filter(([k]) => k !== ref).reduce((a, [, o]) => ({ n: a.n + o.n, cn: a.cn + o.cn }), { n: 0, cn: 0 });
+  const rate = o => o && o.n ? o.cn / o.n : null;
+  return { at, atR, cn, num, du, dupN, cr, others, rate };
+}
+function dSecAlert(D, X) {
+  const { ref, rr } = X, A = dAlerts(D, X), items = [];
+  const add = (s, t, d) => items.push({ s, t, d });
+  if (D.inc) add('warn', `Competência ${fmtComp(D.inc.ym)} possivelmente incompleta`, `${esc(D.inc.why.charAt(0).toUpperCase() + D.inc.why.slice(1))}. Variações e médias que usam essa competência comparam um período parcial.`);
+  else add('ok', 'Competência mais recente', 'O período do relatório cobre o fim da competência mais recente. Isso não prova que está completa, só que o relatório não termina antes dela.');
+  const r1 = A.rate(A.cr), r0 = A.rate(A.others);
+  if (A.cr && A.cr.cn) add('info', `Cancelamentos em ${fmtComp(ref)}`, `${NUM.format(A.cr.cn)} de ${NUM.format(A.cr.n)} NFS-e (${pct(r1)}), ${money(A.cr.cv)}. Nas demais competências: ${r0 === null ? '—' : pct(r0)}.`);
+  else add('ok', `Cancelamentos em ${fmtComp(ref)}`, A.cr ? 'Nenhuma NFS-e cancelada na competência de referência.' : 'Sem NFS-e na competência de referência.');
+  const totMiss = A.num.reduce((a, x) => a + x.miss, 0);
+  add(totMiss ? 'warn' : 'ok', 'Lacunas na numeração', A.num.length ? (totMiss ? `${NUM.format(totMiss)} números ausentes entre o menor e o maior Nº NFS-e de cada emitente, em todos os arquivos. Podem ser notas de outras competências, substituídas ou fora do arquivo.` : 'Nenhum número ausente entre o menor e o maior Nº NFS-e de cada emitente.') : 'Não há números suficientes para checar a sequência.');
+  add(A.atR.length ? 'warn' : 'ok', `Notas com valor atípico em ${fmtComp(ref)}`, A.atR.length ? `${NUM.format(A.atR.length)} ${A.atR.length === 1 ? 'nota' : 'notas'} acima de ${DIAG.atipicoMult}x a mediana do próprio tomador (${NUM.format(A.at.length)} no período todo). Só entram tomadores com ${DIAG.atipicoMinNotas} ou mais notas.` : `Nenhuma nota acima de ${DIAG.atipicoMult}x a mediana do próprio tomador (tomadores com ${DIAG.atipicoMinNotas} ou mais notas).`);
+  add(A.du.length ? 'warn' : 'ok', 'Possíveis duplicidades por conteúdo', A.du.length ? `${NUM.format(A.du.length)} ${A.du.length === 1 ? 'grupo' : 'grupos'} (${NUM.format(A.dupN)} NFS-e) com mesmo emitente, tomador, data de emissão e valor, mas chaves diferentes. Podem ser notas legítimas repetidas; confira na origem.` : 'Nenhum grupo de NFS-e com mesmo emitente, tomador, data de emissão e valor.');
+  const list = `<div class="card-b">${items.map(c => `<div class="g-chk">${stIcon(c.s)}<div><b>${esc(c.t)}.</b> ${c.d}</div></div>`).join('')}</div>`;
+  const head = `<div><h2 class="t-title">Alertas e exceções</h2><p class="t-sub">Pontos para verificar. Nada aqui altera ou corrige registros. Regras no texto de cada item.</p></div>`;
+  const summary = `<div class="card"><div class="card-h"><div><h3 class="t-title">Resumo</h3><p class="t-sub">Competência de referência: ${fmtComp(ref)}.</p></div></div>${list}</div>`;
+  /* cancelamentos por competência */
+  const cRows = [...D.months].reverse().map(m => { const o = A.cn.m.get(m); if (!o) return `<tr class="${m === ref ? 'dg-hl' : ''}"><td class="font-medium">${fmtComp(m)}</td><td class="r">0</td><td class="r">0</td><td class="r">—</td><td class="r">${money(0)}</td><td class="r">—</td></tr>`;
+    return `<tr class="${m === ref ? 'dg-hl' : ''}"><td class="font-medium">${fmtComp(m)}</td><td class="r">${NUM.format(o.n)}</td><td class="r">${NUM.format(o.cn)}</td><td class="r">${o.n ? pct(o.cn / o.n) : '—'}</td><td class="r">${money(o.cv)}</td><td class="r">${o.vc ? pct(o.cv / o.vc) : '—'}</td></tr>`; }).join('');
+  const cancel = dCard('Cancelamentos por competência', 'Considera todas as situações, mesmo que o filtro de Situação esteja deixando as canceladas de fora. Os demais filtros valem.', `<div class="scroll-y scroll-x" style="max-height:380px"><table class="tbl compact"><thead><tr><th>Competência</th><th class="r">NFS-e (todas)</th><th class="r">Canceladas</th><th class="r">% das NFS-e</th><th class="r">Valor cancelado</th><th class="r">% do valor</th></tr></thead><tbody>${cRows}</tbody></table></div>`);
+  /* atípicas */
+  const top = A.atR.slice(0, 15);
+  const atip = A.atR.length ? dCard(`Notas atípicas em ${fmtComp(ref)}`, `Valor acima de ${DIAG.atipicoMult}x a mediana do tomador, calculada com todas as competências carregadas. Clique na linha para abrir a nota.`, `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Nº NFS-e</th><th>Tomador</th><th class="r">Vlr. Serviço</th><th class="r">Mediana do tomador</th><th class="r">Múltiplo</th></tr></thead><tbody>${top.map(a => `<tr data-action="row" data-k="${esc(a.n.key)}"><td>${esc(a.n.num)}</td><td class="wrap font-medium">${esc(trunc(a.n.tom, 44))}</td><td class="r">${money(a.n.vc)}</td><td class="r">${money(Math.round(a.med))}</td><td class="r">${(a.ratio).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}x</td></tr>`).join('')}</tbody></table></div>${A.atR.length > top.length ? `<p class="dg-note">Mostrando as ${top.length} de maior múltiplo, entre ${NUM.format(A.atR.length)}.</p>` : ''}`) : '';
+  /* numeração */
+  const nRows = A.num.filter(x => x.miss).map(x => `<tr><td class="wrap font-medium">${esc(x.nome)}</td><td class="r">${NUM.format(x.min)} a ${NUM.format(x.max)}</td><td class="r">${NUM.format(x.n)}</td><td class="r">${NUM.format(x.miss)}</td><td class="wrap muted">${esc(x.ranges.slice(0, 6).join('; '))}${x.ranges.length > 6 ? ` e mais ${NUM.format(x.ranges.length - 6)} trechos` : ''}</td></tr>`).join('');
+  const numC = nRows ? dCard('Lacunas na numeração', 'Por emitente, em todos os arquivos carregados e todas as situações.', `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Emitente</th><th class="r">Menor a maior Nº</th><th class="r">Números presentes</th><th class="r">Ausentes</th><th>Trechos ausentes</th></tr></thead><tbody>${nRows}</tbody></table></div><p class="dg-note">Só entram números formados apenas por dígitos. Se a prefeitura reiniciar a numeração por ano ou série, as lacunas serão artificiais.</p>`) : '';
+  /* duplicidades */
+  const dRows = A.du.slice(0, 10).map(g => `<tr data-action="row" data-k="${esc(g[0].key)}"><td>${fmtDate(g[0].date)}</td><td class="wrap font-medium">${esc(trunc(g[0].tom, 44))}</td><td class="r">${money(g[0].vc)}</td><td class="r">${NUM.format(g.length)}</td><td class="wrap muted">${esc(g.map(n => n.num).join(', '))}</td></tr>`).join('');
+  const dupC = A.du.length ? dCard('Possíveis duplicidades por conteúdo', 'Mesmo emitente, tomador, data de emissão e valor. Clique na linha para abrir a primeira nota do grupo.', `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Emissão</th><th>Tomador</th><th class="r">Vlr. Serviço</th><th class="r">NFS-e</th><th>Nºs</th></tr></thead><tbody>${dRows}</tbody></table></div>${A.du.length > 10 ? `<p class="dg-note">Mostrando 10 de ${NUM.format(A.du.length)} grupos, os de maior valor.</p>` : ''}`) : '';
+  return { html: `${head}${summary}${cancel}${atip}${numC}${dupC}`, draw: null };
+}
+
+/* --- Conferências --- */
+function dChecks(D, X) {
+  const out = [], add = (s, t, d) => out.push({ s, t, d }), { ref, rr, cr } = X, rows = D.rows;
+  const T = summarize(D.dated), sv = [...rows.values()].reduce((a, r) => ({ vc: a.vc + r.vc, n: a.n + r.n, ic: a.ic + r.ic }), { vc: 0, n: 0, ic: 0 });
+  const ok1 = sv.vc === T.vc && sv.n === T.n && sv.ic === T.ic;
+  add(ok1 ? 'ok' : 'err', 'Soma das competências = total da base', `Competências somam ${money(sv.vc)} (${NUM.format(sv.n)} NFS-e, ISSQN ${money(sv.ic)}); base com competência: ${money(T.vc)} (${NUM.format(T.n)} NFS-e, ISSQN ${money(T.ic)}).`);
+  if (D.noYm) add('warn', 'NFS-e sem competência', `${NUM.format(D.noYm)} NFS-e (${money(summarize(D.base.filter(n => !n.ym)).vc)}) não têm competência e ficam fora desta aba.`);
+  const noDt = !S.F.month && !S.F.from && !S.F.to;
+  if (noDt) { const okV = S.sum.vc === T.vc + summarize(D.base.filter(n => !n.ym)).vc && S.sum.n === D.base.length; add(okV ? 'ok' : 'err', 'Total do Diagnóstico = Visão geral', `Visão geral: ${money(S.sum.vc)} (${NUM.format(S.sum.n)} NFS-e). Diagnóstico: ${money(summarize(D.base).vc)} (${NUM.format(D.base.length)} NFS-e).`); }
+  else add('info', 'Total do Diagnóstico × Visão geral', 'Há filtro de data ativo na Visão geral, que o Diagnóstico ignora. Remova o filtro de data para comparar os totais.');
+  if (cr) {
+    const B = dBridge(D, ref, X.cmpYm), okB = B.sum === B.R && B.nN + B.nA + B.nR + B.nI === rr.tom && B.nP + B.nA + B.nR + B.nI === cr.tom;
+    add(okB ? 'ok' : 'err', 'Ponte fecha com o faturamento', `${money(B.P)} ${signed(B.nov, x => money(x))} ${signed(B.aum, x => money(x))} ${signed(B.red, x => money(x))} ${signed(B.perd, x => money(x))} = ${money(B.sum)}; faturamento de ${fmtComp(ref)}: ${money(B.R)}. Tomadores: ${NUM.format(B.nN + B.nA + B.nR + B.nI)} de ${NUM.format(rr.tom)} em ${fmtComp(ref)} e ${NUM.format(B.nP + B.nA + B.nR + B.nI)} de ${NUM.format(cr.tom)} em ${fmtComp(X.cmpYm)}.`);
+  } else add('info', 'Ponte de faturamento', `${fmtComp(X.cmpYm)} não está na base carregada.`);
+  let badF = 0, nF = 0; for (const m of D.months) { const f = dFlow(D, m); if (!f) continue; nF++; const r = rows.get(m), p = rows.get(dPrevYm(m)); if (f.rec.vc + f.nov.vc !== r.vc || f.rec.n + f.nov.n !== r.tom || f.perd.n !== p.tom - f.rec.n) badF++; }
+  add(badF ? 'err' : 'ok', 'Recorrentes + novos = faturamento de cada competência', badF ? `${NUM.format(badF)} de ${NUM.format(nF)} competências não fecham.` : `${NUM.format(nF)} ${nF === 1 ? 'competência confere' : 'competências conferem'}: recorrentes + novos = ativos e faturamento; recorrentes + perdidos = tomadores da competência anterior.`);
+  let badC = 0; for (const m of D.months) { const c = dConc(rows.get(m).tm); if (c.tot !== rows.get(m).vc || c.n !== rows.get(m).tom) badC++; }
+  add(badC ? 'err' : 'ok', 'Concentração soma o faturamento da competência', badC ? `${NUM.format(badC)} competências não fecham.` : 'A soma dos tomadores de cada competência confere com o faturamento e com a contagem de tomadores.');
+  const chk2 = (label, list, row) => { const f = dFaixas(list), n = f.reduce((a, x) => a + x.n, 0), v = f.reduce((a, x) => a + x.vc, 0); return n === row.n && v === row.vc; };
+  const okF = chk2('', rr.list, rr) && (!cr || chk2('', cr.list, cr));
+  add(okF ? 'ok' : 'err', 'Faixas de valor somam o faturamento', `Soma das faixas em ${fmtComp(ref)}: ${money(dFaixas(rr.list).reduce((a, x) => a + x.vc, 0))} (${NUM.format(dFaixas(rr.list).reduce((a, x) => a + x.n, 0))} NFS-e) para ${money(rr.vc)} (${NUM.format(rr.n)} NFS-e).`);
+  if (hasCat()) { const a = groupBy(rr.list, n => n.cat).reduce((s, g) => s + g.vc, 0), b = cr ? groupBy(cr.list, n => n.cat).reduce((s, g) => s + g.vc, 0) : null; add(a === rr.vc && (b === null || b === cr.vc) ? 'ok' : 'err', 'Mix soma o faturamento', `Tipos de serviço somam ${money(a)} em ${fmtComp(ref)} (faturamento ${money(rr.vc)}).`); }
+  const gr = groupBy(rr.list, n => n.ret), rv = gr.reduce((s, g) => s + g.vc, 0), ri = gr.reduce((s, g) => s + g.ic, 0);
+  add(rv === rr.vc && ri === rr.ic ? 'ok' : 'err', 'Retenção soma o faturamento e o ISSQN', `Rótulos somam ${money(rv)} e ISSQN ${money(ri)} em ${fmtComp(ref)} (faturamento ${money(rr.vc)}, ISSQN ${money(rr.ic)}).`);
+  const H = dHeat(D);
+  if (H.has) { const dd = D.dated.filter(n => n.date && S.sources.some(s => s.name === n.src && s.cols.dgen)), s2 = summarize(dd); const byWd = H.cell.reduce((a, r) => a + r.reduce((x, c) => x + c.vc, 0), 0), byDay = Array.from({ length: 31 }, (_, d) => H.cell.reduce((a, r) => a + r[d].vc, 0)).reduce((a, b) => a + b, 0);
+    add(H.tot.vc === s2.vc && H.tot.n === s2.n && byWd === s2.vc && byDay === s2.vc ? 'ok' : 'err', 'Padrões de emissão somam as NFS-e com data', `Mapa: ${money(H.tot.vc)} (${NUM.format(H.tot.n)} NFS-e); notas com Data de Emissão: ${money(s2.vc)} (${NUM.format(s2.n)}).${H.skipped ? ` ${NUM.format(H.skipped)} NFS-e sem Data de Emissão ficam de fora.` : ''}`); }
+  else add('info', 'Padrões de emissão', 'A planilha não tem a coluna Data de Emissão.');
+  return out;
+}
+function dSecConf(D, X, checks) {
+  return { html: `<div><h2 class="t-title">Conferências do Diagnóstico</h2><p class="t-sub">Cada bloco desta aba é conferido contra a base filtrada. Valem para a competência de referência e os filtros atuais.</p></div><div class="card"><div class="card-b">${checks.map(c => `<div class="g-chk">${stIcon(c.s)}<div><b>${esc(c.t)}.</b> ${c.d}</div></div>`).join('')}</div></div>`, draw: null };
+}
+
+/* --- Aba --- */
+function renderDiag() {
+  const el = $('#view-diag'); if (!el) return;
+  ['c-dg-evo', 'c-dg-ponte'].forEach(id => { if (charts[id]) { charts[id].destroy(); delete charts[id]; } });
+  const D = dModel();
+  if (!D.months.length) { el.innerHTML = `<div class="card">${dEmptyMsg('Nenhuma NFS-e com competência no filtro atual. Ajuste os filtros para ver o diagnóstico.')}</div>`; return; }
+  const X = dContext(D), st = X.st, checks = dChecks(D, X), bad = checks.filter(c => c.s === 'err').length, good = checks.filter(c => c.s === 'ok').length;
+  const sec = ({ cresc: dSecCresc, cart: dSecCart, comp: dSecComp, trib: dSecTrib, pad: dSecPad, alert: dSecAlert })[st.sec];
+  const body = st.sec === 'conf' ? dSecConf(D, X, checks) : (sec || dSecCresc)(D, X);
+  const bar = `<section class="card no-print"><div class="dg-bar">
+    <div class="g-f"><label class="lbl" for="d-ref">Competência de referência</label><select id="d-ref" class="inp">${[...D.months].reverse().map(m => `<option value="${m}" ${m === X.ref ? 'selected' : ''}>${fmtComp(m)}</option>`).join('')}</select></div>
+    <div class="g-f grow"><span class="lbl">Seção</span><div class="dg-nav"><div class="seg" role="group" aria-label="Seção do diagnóstico">${DSEC.map(([k, l]) => `<button data-action="d-sec" data-v="${k}" aria-pressed="${st.sec === k}">${l}${k === 'conf' ? ` <span class="badge ${bad ? 'b-neg' : 'b-pos'}" style="margin-left:.25rem">${bad ? bad + ' com erro' : good + ' ok'}</span>` : ''}</button>`).join('')}</div></div></div>
+  </div></section>`;
+  const notes = [];
+  if (S.F.month || S.F.from || S.F.to) notes.push(`<div class="alert al-info no-print"><span class="ai">${ico('info')}</span><div>Os filtros de data da Visão geral não valem aqui. O Diagnóstico usa todas as competências carregadas e escolhe a de referência acima. Situação, retenção, tipo de serviço, tomador, valor e busca continuam valendo.</div></div>`);
+  if (D.inc && st.sec !== 'alert' && st.sec !== 'conf') notes.push(`<div class="alert al-warn"><span class="ai">${ico('alert')}</span><div class="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1"><span><b class="font-medium">${fmtComp(D.inc.ym)} possivelmente incompleta:</b> ${esc(D.inc.why)}. ${X.ref === D.inc.ym ? 'As variações abaixo comparam um período parcial.' : 'Ela entra nas tabelas, mas fica fora da média, do melhor e do pior mês.'}</span>${X.ref === D.inc.ym && D.months.length > 1 ? `<button class="btn btn-sm no-print" data-action="d-prev">Usar ${fmtComp(dPrevYm(D.inc.ym))}</button>` : ''}</div></div>`);
+  if (bad) notes.push(`<div class="alert al-err"><span class="ai">${ico('alert')}</span><div class="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1"><span><b class="font-medium">${bad} ${bad === 1 ? 'conferência não fecha' : 'conferências não fecham'}.</b> Os números desta aba não devem ser usados até resolver.</span><button class="btn btn-sm no-print" data-action="d-sec" data-v="conf">Ver conferências</button></div></div>`);
+  el.innerHTML = bar + notes.join('') + body.html;
+  if (body.draw) body.draw();
+}
+
 /* ---------- Tema ---------- */
 function setTheme(t) {
   document.documentElement.classList.toggle('dark', t === 'dark');
@@ -1672,6 +2125,9 @@ const H = {
   'g-clear'() { S.G = gDefaults(); renderGrupo(); },
   'g-tbl'(el) { S.G.tblAll = el.dataset.v === 'all'; renderGrupo(); },
   'g-scope'(el) { S.G.scope = el.dataset.v; renderGrupo(); },
+  'd-sec'(el) { S.D.sec = el.dataset.v; renderDiag(); },
+  'd-cmp'(el) { S.D.cmp = el.dataset.v; renderDiag(); },
+  'd-prev'() { S.D.ref = dPrevYm(S.D.ref); renderDiag(); },
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
@@ -1692,6 +2148,7 @@ document.addEventListener('change', e => {
   if (id === 'emp-sel') { S.emp = v; S.view = S.view; applyScope(); }
   else if (id === 'g-month') { S.G.month = v; renderGrupo(); }
   else if (id === 'g-foco') { S.G.foco = v; renderGrupo(); }
+  else if (id === 'd-ref') { S.D.ref = v; renderDiag(); }
   else if (id === 'f-month') { S.F.month = v; onFilterChange(); }
   else if (id === 'f-from') { S.F.from = v; onFilterChange(); }
   else if (id === 'f-to') { S.F.to = v; onFilterChange(); }
