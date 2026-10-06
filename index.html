@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard de faturamento NFS-e</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  /* Aplica o tema salvo antes da primeira pintura (evita flash). */
+  try { var t = localStorage.getItem('nfse-theme');
+    if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
+  } catch (e) {}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+  /* Alternativas caso um CDN esteja indisponível. */
+  window.Chart || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"><\/script>');
+  window.XLSX || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>');
+</script>
+<style>
+  :root{
+    --bg:#f2f5f7; --surface:#ffffff; --surface-2:#f7f9fa; --line:#dde4e9; --line-strong:#c5cfd6;
+    --ink:#13212b; --ink-2:#37495a; --muted:#5b6d79;
+    --brand:#0d6b73; --brand-ink:#ffffff; --brand-soft:#e2f0f1;
+    --amber:#9a5207; --amber-soft:#fbefdb; --pos:#17703a; --pos-soft:#dff1e5;
+    --neg:#b3261e; --neg-soft:#fbe4e2; --info:#2a5a9c; --info-soft:#e3ecf8; --grid:#e4e9ed;
+  }
+  html.dark{
+    --bg:#0c1519; --surface:#131e23; --surface-2:#18262c; --line:#25353c; --line-strong:#364a53;
+    --ink:#e8eff2; --ink-2:#c4d1d7; --muted:#8fa4ae;
+    --brand:#4db6bf; --brand-ink:#05191c; --brand-soft:#15363b;
+    --amber:#e3a65c; --amber-soft:#3a2a14; --pos:#5fca86; --pos-soft:#14301f;
+    --neg:#f28c84; --neg-soft:#3b1b19; --info:#93b8ec; --info-soft:#182a40; --grid:#223239;
+  }
+  html{color-scheme:light} html.dark{color-scheme:dark}
+  body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums lining-nums;-webkit-font-smoothing:antialiased}
+  [hidden]{display:none!important}
+  .ovl.hidden,.menu.hidden,.toast.hidden,.badge.hidden{display:none}
+  .grid>*{min-width:0}
+  :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  .muted{color:var(--muted)}
+  .hdr{background:var(--surface);border-bottom:1px solid var(--line)}
+  .logo{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;background:var(--brand);color:var(--brand-ink);flex:none}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+  .card-h{padding:14px 16px 0;display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px}
+  .card-b{padding:12px 16px 16px}
+  .t-title{font-size:.9375rem;font-weight:600;color:var(--ink)}
+  .t-sub{font-size:.8125rem;color:var(--muted);margin-top:2px}
+  .chart-box{position:relative;height:280px}
+  .chart-box.tall{height:340px}
+  .btn{display:inline-flex;align-items:center;gap:.45rem;padding:.42rem .75rem;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font-size:.8125rem;font-weight:500;cursor:pointer;white-space:nowrap}
+  .btn:hover{background:var(--surface-2)}
+  .btn-primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+  .btn-primary:hover{background:var(--brand);filter:brightness(1.1)}
+  .btn-ghost{border-color:transparent;background:transparent}
+  .btn-sm{padding:.25rem .55rem;font-size:.78rem}
+  .btn:disabled{opacity:.4;cursor:default}
+  .inp{width:100%;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);border-radius:8px;padding:.45rem .65rem;font-size:.8125rem;font-family:inherit}
+  .inp::placeholder{color:var(--muted)}
+  .lbl{display:block;font-size:.75rem;font-weight:500;color:var(--muted);margin-bottom:.3rem}
+  .chip{display:inline-flex;align-items:center;gap:.4rem;padding:.22rem .65rem;border-radius:999px;border:1px solid var(--line-strong);font-size:.78rem;background:var(--surface);color:var(--ink-2);cursor:pointer;font-family:inherit}
+  .chip .n{color:var(--muted);font-size:.7rem}
+  .chip[aria-pressed="true"]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);font-weight:500}
+  .chip[aria-pressed="false"]{text-decoration:line-through;text-decoration-color:var(--line-strong);opacity:.8}
+  .chip.static{cursor:default}
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .seg button{padding:.28rem .7rem;font-size:.78rem;color:var(--ink-2);font-family:inherit;white-space:nowrap}
+  .seg button+button{border-left:1px solid var(--line-strong)}
+  .seg button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);font-weight:500}
+  .tab{display:inline-flex;align-items:center;gap:.4rem;padding:.7rem .9rem;font-size:.84rem;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--brand)}
+  .badge{display:inline-block;padding:.08rem .5rem;border-radius:6px;font-size:.72rem;font-weight:500;white-space:nowrap}
+  .b-pos{background:var(--pos-soft);color:var(--pos)} .b-amber{background:var(--amber-soft);color:var(--amber)}
+  .b-neg{background:var(--neg-soft);color:var(--neg)} .b-info{background:var(--info-soft);color:var(--info)}
+  .b-mute{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)} .b-brand{background:var(--brand-soft);color:var(--brand)}
+  .kpis{display:grid;grid-template-columns:1fr;gap:1px;background:var(--line);overflow:hidden}
+  @media (min-width:560px){.kpis{grid-template-columns:1fr 1fr}}
+  @media (min-width:1024px){.kpis{grid-template-columns:1.55fr 1fr 1fr 1.1fr}}
+  @media (min-width:1024px){.kpis.kn{grid-template-columns:repeat(var(--kc,5),minmax(0,1fr))}}
+  @media (min-width:560px) and (max-width:1023px){.kpis.kn>.kpi:last-child:nth-child(odd){grid-column:1/-1}}
+  .kpi{background:var(--surface);padding:16px 18px;min-width:0}
+  .kpi-l{font-size:.8rem;font-weight:500;color:var(--muted)}
+  .kpi-v{font-size:1.5rem;line-height:1.2;font-weight:600;letter-spacing:-.01em;margin-top:.3rem;overflow-wrap:anywhere}
+  .kpi.big .kpi-v{font-size:1.95rem}
+  .kpi-s{margin-top:.45rem;font-size:.78rem;color:var(--muted);line-height:1.45}
+  .scroll-x{overflow-x:auto} .scroll-y{max-height:68vh;overflow:auto}
+  .tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:.8125rem}
+  .tbl th{position:sticky;top:0;z-index:1;background:var(--surface-2);text-align:left;font-weight:600;font-size:.75rem;color:var(--ink-2);padding:.55rem .75rem;border-bottom:1px solid var(--line);white-space:nowrap;user-select:none}
+  .tbl th[data-action]{cursor:pointer} .tbl th[data-action]:hover{color:var(--ink)}
+  .tbl td{padding:.5rem .75rem;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+  .tbl tbody tr:hover td{background:var(--surface-2)}
+  .tbl tr[data-action]{cursor:pointer}
+  .tbl .r{text-align:right} .tbl td.wrap{white-space:normal;min-width:200px;max-width:340px}
+  .tbl tfoot td{font-weight:600;background:var(--surface-2);position:sticky;bottom:0;border-top:1px solid var(--line-strong);border-bottom:0}
+  .tbl.compact td,.tbl.compact th{padding:.42rem .65rem}
+  @media (max-width:639px){.tbl.compact td,.tbl.compact th{padding:.4rem .45rem;font-size:.76rem}}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.75rem}
+  .menu{position:absolute;right:0;top:calc(100% + 6px);min-width:230px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(8,20,26,.16);padding:6px;z-index:60}
+  .menu button,.menu .opt{display:flex;width:100%;align-items:flex-start;gap:.6rem;text-align:left;padding:.5rem .6rem;border-radius:7px;font-size:.8125rem;color:var(--ink);font-family:inherit;cursor:pointer}
+  .menu button:hover,.menu .opt:hover{background:var(--surface-2)}
+  .alert{display:flex;gap:.65rem;align-items:flex-start;border:1px solid;border-radius:8px;padding:.6rem .8rem;font-size:.8125rem;line-height:1.45}
+  .al-err{background:var(--neg-soft);border-color:var(--neg);color:var(--ink)} .al-err .ai{color:var(--neg)}
+  .al-warn{background:var(--amber-soft);border-color:var(--amber);color:var(--ink)} .al-warn .ai{color:var(--amber)}
+  .al-info{background:var(--info-soft);border-color:var(--info);color:var(--ink)} .al-info .ai{color:var(--info)}
+  .alert .ai{flex:none;margin-top:1px}
+  .drop{display:flex;flex-direction:column;align-items:center;gap:.5rem;text-align:center;padding:2.5rem 1.5rem;border:1.5px dashed var(--line-strong);border-radius:12px;background:var(--surface);cursor:pointer}
+  .drop:hover,.drop.over{border-color:var(--brand);background:var(--brand-soft)}
+  .ovl{position:fixed;inset:0;z-index:80;background:rgba(7,17,21,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+  .modal{width:100%;max-width:720px;max-height:90vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:90;background:var(--ink);color:var(--bg);padding:.55rem .9rem;border-radius:8px;font-size:.8125rem;max-width:90vw}
+  .spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line-strong);border-top-color:var(--brand);animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .dl{display:grid;grid-template-columns:max-content 1fr;gap:.45rem 1rem;font-size:.8125rem}
+  .dl dt{color:var(--muted)} .dl dd{margin:0;overflow-wrap:anywhere}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
+  .st{display:inline-flex;flex:none;margin-top:1px}
+  .st.ok{color:var(--pos)} .st.warn{color:var(--amber)} .st.err{color:var(--neg)} .st.info{color:var(--info)}
+  .pos{color:var(--pos)} .neg{color:var(--neg)}
+  .print-only{display:none}
+  ::-webkit-scrollbar{height:10px;width:10px} ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:8px;border:2px solid var(--surface)}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  /* ---- Aba Grupo ---- */
+  #view-grupo>*{min-width:0}
+  .g-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 20px;padding:14px 16px}
+  .g-f{min-width:170px}
+  .g-f.grow{flex:1 1 280px}
+  .g-chips{display:flex;flex-wrap:wrap;gap:.5rem}
+  .g-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
+  @media (min-width:1024px){.g-grid.g-21{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}}
+  .g-empty{padding:2.2rem 1rem;text-align:center;font-size:.875rem}
+  .g-bar{height:4px;border-radius:2px;background:var(--line);margin-top:5px;min-width:90px}
+  .g-bar>span{display:block;height:100%;border-radius:2px;background:var(--brand)}
+  .g-mx td,.g-mx th{text-align:right}
+  .g-mx th:first-child,.g-mx td:first-child{text-align:left}
+  .g-mx td.g-focus,.g-mx th.g-focus{box-shadow:inset 2px 0 0 var(--brand),inset -2px 0 0 var(--brand)}
+  .g-mx th.g-focus{background:var(--brand-soft);color:var(--brand)}
+  .g-mx td.g-zero{color:var(--muted)}
+  .g-mx td.g-self{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--line) 5px 6px)}
+  .g-chk{display:flex;gap:.65rem;align-items:flex-start;padding:.6rem 0;border-bottom:1px solid var(--line);font-size:.8125rem;line-height:1.45}
+  .g-chk:last-child{border-bottom:0}
+  .g-chk b{font-weight:500}
+  @media print{
+    @page{size:A4 landscape;margin:10mm}
+    body{background:#fff!important;font-size:12px}
+    .no-print,header.hdr,#filters,#alerts,#toast,#modal,#loading,#dropovl{display:none!important}
+    .print-only{display:block!important}
+    main{padding:0!important;max-width:none!important}
+    .card{break-inside:avoid;box-shadow:none}
+    .chart-box{height:auto!important}
+    .chart-box canvas{width:100%!important;max-width:100%!important;height:auto!important}
+    #c-dim{max-height:200px!important;width:auto!important}
+    .scroll-y,.scroll-x{max-height:none!important;overflow:visible!important}
+    .tbl th,.tbl tfoot td{position:static!important}
+    .tbl td,.tbl th{padding:.22rem .45rem!important;font-size:10px!important}
+    .tbl td.wrap{max-width:none!important;min-width:0!important}
+    .kpis{grid-template-columns:1.55fr 1.1fr .8fr 1.1fr!important}
+    .kpis.kn{grid-template-columns:repeat(var(--kc,5),minmax(0,1fr))!important}
+    .kpi-v{font-size:1.15rem!important;overflow-wrap:normal!important;white-space:nowrap}
+    .kpi.big .kpi-v{font-size:1.5rem!important}
+    .pg2{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+    .pg3{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+    .g-grid.g-21{grid-template-columns:minmax(0,3fr) minmax(0,2fr)!important}
+    .pg5{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+    .pg3>.lg\:col-span-2,.pg5>.lg\:col-span-2{grid-column:span 2 / span 2!important}
+    .pg5>.lg\:col-span-3{grid-column:span 3 / span 3!important}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+<style id="tw-compiled">/* Tailwind CSS 3.4 compilado (somente as classes usadas). */
+*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/*! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com*/*,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}:after,:before{--tw-content:""}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;-o-tab-size:4;tab-size:4;font-family:IBM Plex Sans,system-ui,sans-serif;font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::-moz-placeholder,textarea::-moz-placeholder{opacity:1;color:#9ca3af}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.pointer-events-none{pointer-events:none}.static{position:static}.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}.sticky{position:sticky}.left-3{left:.75rem}.top-0{top:0}.top-1{top:.25rem}.z-40{z-index:40}.mx-auto{margin-left:auto;margin-right:auto}.-mb-px{margin-bottom:-1px}.mb-2{margin-bottom:.5rem}.ml-auto{margin-left:auto}.mt-0{margin-top:0}.mt-0\.5{margin-top:.125rem}.mt-1{margin-top:.25rem}.mt-2{margin-top:.5rem}.mt-3{margin-top:.75rem}.mt-5{margin-top:1.25rem}.mt-6{margin-top:1.5rem}.block{display:block}.flex{display:flex}.table{display:table}.grid{display:grid}.hidden{display:none}.h-14{height:3.5rem}.h-3{height:.75rem}.h-3\.5{height:.875rem}.h-4{height:1rem}.h-5{height:1.25rem}.h-8{height:2rem}.h-\[18px\]{height:18px}.min-h-screen{min-height:100vh}.\!w-auto{width:auto!important}.w-14{width:3.5rem}.w-3{width:.75rem}.w-3\.5{width:.875rem}.w-4{width:1rem}.w-5{width:1.25rem}.w-8{width:2rem}.w-\[18px\]{width:18px}.w-full{width:100%}.min-w-0{min-width:0}.min-w-\[200px\]{min-width:200px}.min-w-\[240px\]{min-width:240px}.max-w-3xl{max-width:48rem}.max-w-\[1600px\]{max-width:1600px}.max-w-full{max-width:100%}.max-w-xl{max-width:36rem}.flex-1{flex:1 1 0%}.shrink-0{flex-shrink:0}.-translate-y-1{--tw-translate-y:-0.25rem}.-translate-y-1,.transform{transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.list-disc{list-style-type:disc}.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.flex-wrap{flex-wrap:wrap}.items-start{align-items:flex-start}.items-end{align-items:flex-end}.items-center{align-items:center}.items-baseline{align-items:baseline}.justify-between{justify-content:space-between}.gap-1{gap:.25rem}.gap-2{gap:.5rem}.gap-2\.5{gap:.625rem}.gap-3{gap:.75rem}.gap-4{gap:1rem}.gap-x-3{-moz-column-gap:.75rem;column-gap:.75rem}.gap-x-4{-moz-column-gap:1rem;column-gap:1rem}.gap-x-5{-moz-column-gap:1.25rem;column-gap:1.25rem}.gap-y-1{row-gap:.25rem}.gap-y-2{row-gap:.5rem}.gap-y-4{row-gap:1rem}.space-y-1>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.25rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.25rem*var(--tw-space-y-reverse))}.space-y-1\.5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.375rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.375rem*var(--tw-space-y-reverse))}.space-y-2>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.5rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.5rem*var(--tw-space-y-reverse))}.space-y-2\.5>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(.625rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(.625rem*var(--tw-space-y-reverse))}.space-y-4>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem*(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem*var(--tw-space-y-reverse))}.self-start{align-self:flex-start}.overflow-x-auto{overflow-x:auto}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rounded-lg{border-radius:.5rem}.border{border-width:1px}.border-b{border-bottom-width:1px}.border-t{border-top-width:1px}.p-3{padding:.75rem}.p-4{padding:1rem}.\!px-0{padding-left:0!important;padding-right:0!important}.px-2{padding-left:.5rem;padding-right:.5rem}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.px-5{padding-left:1.25rem;padding-right:1.25rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.py-1{padding-top:.25rem;padding-bottom:.25rem}.py-1\.5{padding-top:.375rem;padding-bottom:.375rem}.py-2{padding-top:.5rem;padding-bottom:.5rem}.py-2\.5{padding-top:.625rem;padding-bottom:.625rem}.py-3{padding-top:.75rem;padding-bottom:.75rem}.py-4{padding-top:1rem;padding-bottom:1rem}.py-5{padding-top:1.25rem;padding-bottom:1.25rem}.py-6{padding-top:1.5rem;padding-bottom:1.5rem}.\!pb-0{padding-bottom:0!important}.\!pb-1{padding-bottom:.25rem!important}.pb-3{padding-bottom:.75rem}.pl-5{padding-left:1.25rem}.pl-\[18px\]{padding-left:18px}.pt-1{padding-top:.25rem}.text-right{text-align:right}.text-2xl{font-size:1.5rem;line-height:2rem}.text-\[0\.95rem\]{font-size:.95rem}.text-\[11px\]{font-size:11px}.text-base{font-size:1rem;line-height:1.5rem}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.font-medium{font-weight:500}.font-normal{font-weight:400}.font-semibold{font-weight:600}.leading-relaxed{line-height:1.625}.leading-tight{line-height:1.25}.tracking-tight{letter-spacing:-.025em}.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.last\:border-0:last-child{border-width:0}.empty\:hidden:empty{display:none}@media (min-width:640px){.sm\:col-span-2{grid-column:span 2/span 2}.sm\:inline{display:inline}.sm\:w-44{width:11rem}.sm\:max-w-md{max-width:28rem}.sm\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.sm\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.sm\:p-4{padding:1rem}.sm\:px-4{padding-left:1rem;padding-right:1rem}.sm\:px-6{padding-left:1.5rem;padding-right:1.5rem}.sm\:py-14{padding-top:3.5rem;padding-bottom:3.5rem}.sm\:py-6{padding-top:1.5rem;padding-bottom:1.5rem}.sm\:text-\[1\.9rem\]{font-size:1.9rem}}@media (min-width:768px){.md\:max-w-xs{max-width:20rem}.md\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (min-width:1024px){.lg\:col-span-2{grid-column:span 2/span 2}.lg\:col-span-3{grid-column:span 3/span 3}.lg\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.lg\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.lg\:grid-cols-5{grid-template-columns:repeat(5,minmax(0,1fr))}}
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="hdr sticky top-0 z-40 no-print">
+  <div class="mx-auto max-w-[1600px] px-3 sm:px-6">
+    <div class="flex h-14 min-w-0 items-center gap-3">
+      <span class="logo"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11M12 20V4M19 20v-6"/></svg></span>
+      <div class="min-w-0">
+        <h1 class="truncate text-[0.95rem] font-semibold leading-tight">Dashboard de faturamento NFS-e</h1>
+        <p id="hdr-sub" class="muted truncate text-xs">Carregue uma planilha para começar</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-x-4">
+    <nav id="tabs" role="tablist" aria-label="Seções" class="-mb-px flex min-w-0 gap-1 overflow-x-auto hidden"></nav>
+    <div class="ml-auto flex shrink-0 items-center gap-2 py-1">
+      <button class="btn" data-action="upload" title="Carregar arquivos"><span id="ic-up"></span><span class="hidden sm:inline">Carregar arquivos</span></button>
+      <div class="relative hidden" id="export-wrap">
+        <button class="btn" data-action="export-menu" aria-haspopup="true"><span id="ic-dl"></span><span class="hidden sm:inline">Exportar</span></button>
+        <div id="export-menu" class="menu hidden" role="menu">
+          <button data-action="export-xlsx" role="menuitem"><span id="ic-xl" class="st"></span><span><b class="block font-medium">Excel (.xlsx)</b><span class="muted text-xs">Resumo, NFS-e filtradas, agrupamentos e validação</span></span></button>
+          <button data-action="export-pdf" role="menuitem"><span id="ic-pr" class="st"></span><span><b class="block font-medium">PDF</b><span class="muted text-xs">Abre a impressão da tela atual; escolha “Salvar como PDF”</span></span></button>
+        </div>
+      </div>
+      <button class="btn btn-ghost" data-action="theme" id="btn-theme" aria-label="Alternar modo escuro"></button>
+    </div>
+    </div>
+  </div>
+</header>
+
+<main class="mx-auto max-w-[1600px] px-3 py-4 sm:px-6 sm:py-6">
+
+  <section id="empty" class="mx-auto max-w-3xl py-6 sm:py-14">
+    <h2 class="text-2xl font-semibold tracking-tight sm:text-[1.9rem]">Envie as planilhas de NFS-e</h2>
+    <p class="muted mt-2 max-w-xl text-[0.95rem] leading-relaxed">Aceita o arquivo <b>LOTE_NNAC_EMITIDAS</b> (aba “NFS-e”, com as abas “Resumo” e “Log” usadas na conferência), em .xlsx, .xls ou .csv.</p>
+    <div id="empty-errors" class="mt-5 space-y-2"></div>
+    <label id="drop" class="drop mt-5" for="file">
+      <span class="muted" id="ic-drop"></span>
+      <span class="text-base font-medium">Arraste os arquivos para cá</span>
+      <span class="muted text-sm">ou clique para escolher no computador</span>
+    </label>
+    <ul class="mt-6 grid gap-3 text-sm sm:grid-cols-3">
+      <li class="card p-3"><b class="block font-medium">Tudo local</b><span class="muted">Os dados são processados no navegador e não são enviados a nenhum servidor.</span></li>
+      <li class="card p-3"><b class="block font-medium">Validação automática</b><span class="muted">Duplicidades, valores inválidos e conferência com os totais do rodapé.</span></li>
+      <li class="card p-3"><b class="block font-medium">Análise e exportação</b><span class="muted">Filtros, ranking, comparativo de períodos, Excel e PDF.</span></li>
+    </ul>
+  </section>
+
+  <div id="workspace" class="hidden space-y-4">
+    <div id="print-head" class="print-only"></div>
+    <div id="emp-bar" class="hidden no-print"></div>
+    <div id="alerts" class="space-y-2 no-print"></div>
+    <section id="filters" class="card no-print"></section>
+
+    <div id="view-overview" class="space-y-4">
+      <div id="kpis" class="card kpis"></div>
+      <div id="kpis-tax" class="card kpis kn"></div>
+      <div id="emp-card" class="card hidden"></div>
+
+      <div class="flex flex-wrap items-end justify-between gap-2 pt-1">
+        <div><h2 class="t-title">Evolução no período</h2><p class="t-sub" id="evo-sub"></p></div>
+        <div class="seg no-print" id="seg-gran" role="group" aria-label="Agrupar por">
+          <button data-action="gran" data-v="dia" aria-pressed="false">Dia</button>
+          <button data-action="gran" data-v="semana" aria-pressed="false">Semana</button>
+          <button data-action="gran" data-v="mes" aria-pressed="false">Competência</button>
+        </div>
+      </div>
+      <div class="grid gap-4 pg2 lg:grid-cols-2">
+        <div class="card"><div class="card-h"><h3 class="t-title" id="t-fat">Faturamento</h3>
+          <div class="seg no-print" id="seg-fat" role="group" aria-label="Detalhar faturamento"><button data-action="fatmode" data-v="cat" aria-pressed="true">Por tipo de serviço</button><button data-action="fatmode" data-v="total" aria-pressed="false">Total</button></div></div>
+          <div class="card-b"><div class="chart-box"><canvas id="c-fat" role="img" aria-label="Gráfico de faturamento por período"></canvas></div><div id="fat-cats" class="mt-3 space-y-1.5 text-sm"></div></div></div>
+        <div class="card"><div class="card-h"><h3 class="t-title" id="t-iss">ISSQN</h3><div class="seg no-print" id="seg-tax" role="group" aria-label="Tributo"><button data-action="tax" data-v="ic" aria-pressed="true">ISSQN</button><button data-action="tax" data-v="irrf" aria-pressed="false">IRRF</button><button data-action="tax" data-v="csll" aria-pressed="false">CSLL</button><button data-action="tax" data-v="inss" aria-pressed="false">INSS</button><button data-action="tax" data-v="cbs" aria-pressed="false">CBS</button><button data-action="tax" data-v="ibs" aria-pressed="false">IBS</button></div></div><div class="card-b"><div class="chart-box"><canvas id="c-iss" role="img" aria-label="Gráfico de ISSQN por período"></canvas></div></div></div>
+      </div>
+
+      <div class="grid gap-4 pg2 lg:grid-cols-2">
+        <div class="card">
+          <div class="card-h"><div><h3 class="t-title">Faturamento por <span id="dim-name">tipo de serviço</span></h3></div>
+            <div class="seg no-print" id="seg-dim" role="group" aria-label="Dimensão">
+              <button data-action="dim" data-v="emp" aria-pressed="false" hidden>Empresa</button><button data-action="dim" data-v="cat" aria-pressed="true">Tipo de serviço</button><button data-action="dim" data-v="ret" aria-pressed="false">Retenção ISSQN</button>
+              <button data-action="dim" data-v="sit" aria-pressed="false">Situação</button>
+              
+            </div></div>
+          <div class="card-b"><div class="chart-box" style="height:210px"><canvas id="c-dim" role="img" aria-label="Distribuição do faturamento"></canvas></div><div id="dim-legend" class="mt-3 space-y-1.5 text-sm"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><div><h3 class="t-title">Faturamento por tipo de contratação</h3><p class="t-sub">Somente serviços de Plano de Saúde. CPF é Individual/Familiar. CNPJ é Coletivo Empresarial, exceto o CNPJ 97.553.801/0011-98, que é Coletivo por Adesão.</p></div></div>
+          <div class="card-b"><div class="chart-box" style="height:210px"><canvas id="c-contr" role="img" aria-label="Faturamento por tipo de contratação"></canvas></div><div id="contr-legend" class="mt-3 space-y-2.5 text-sm"></div></div>
+        </div>
+      </div>
+
+      <div class="grid gap-4 pg5 lg:grid-cols-5">
+        <div class="card lg:col-span-2"><div class="card-h"><div><h3 class="t-title">Faturamento por tomador</h3><p class="t-sub" id="tom-sub">Os 10 maiores tomadores</p></div></div><div class="card-b"><div class="chart-box tall"><canvas id="c-tom" role="img" aria-label="Faturamento dos maiores tomadores"></canvas></div></div></div>
+        <div class="card lg:col-span-3" id="cmp"></div>
+      </div>
+
+      <div class="card" id="rank"></div>
+    </div>
+
+    <div id="view-table" class="hidden">
+      <div class="card">
+        <div class="card-h"><div><h2 class="t-title">NFS-e detalhadas</h2><p class="t-sub" id="tbl-sub"></p></div>
+          <div class="no-print flex items-center gap-2"><label for="t-size" class="muted text-xs">Linhas por página</label>
+            <select id="t-size" class="inp !w-auto"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></div></div>
+        <div class="card-b !px-0 !pb-0"><div class="scroll-y scroll-x" id="tbl-wrap"></div>
+          <div id="pager" class="no-print flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3" style="border-color:var(--line)"></div></div>
+      </div>
+    </div>
+
+    <div id="view-validation" class="hidden space-y-4"></div>
+    <div id="view-grupo" class="hidden space-y-4"></div>
+  </div>
+</main>
+
+<input id="file" type="file" class="hidden" multiple accept=".xlsx,.xlsm,.xls,.csv,.tsv,.txt">
+<div id="dropovl" class="ovl hidden no-print" style="pointer-events:none"><div class="card px-6 py-5 text-base font-medium">Solte os arquivos para carregar</div></div>
+<div id="loading" class="ovl hidden"><div class="card flex items-center gap-3 px-5 py-4"><div class="spin"></div><span id="loading-txt" class="text-sm">Lendo arquivos…</span></div></div>
+<div id="modal" class="ovl hidden" data-action="close-modal"><div class="modal" id="modal-body" role="dialog" aria-modal="true"></div></div>
+<div id="toast" class="toast hidden" role="status"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   NÚCLEO DE DADOS — leitura, tratamento, cruzamento, filtros, validação
+   ===================================================================== */
+/* CORE-START */
+const pad2 = n => String(n).padStart(2, '0');
+const fold = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const norm = s => fold(s).replace(/[^a-z0-9]/g, '');
+const txt = v => (v === null || v === undefined) ? '' : String(v).trim();
+const cents = v => (v === null || v === undefined) ? null : Math.round(v * 100);
+const isCancel = s => /cancel/i.test(s || '');
+/* Regras de classificação (ajuste aqui se mudarem) */
+const ADESAO_CNPJS = ['97553801001198'];                       /* 97.553.801/0011-98 */
+const CONTR = { ind: 'Individual/Familiar', emp: 'Coletivo Empresarial', ade: 'Coletivo por Adesão' };
+const contrOf = d => d.length === 11 ? CONTR.ind : d.length === 14 ? (ADESAO_CNPJS.includes(d) ? CONTR.ade : CONTR.emp) : 'Não identificado';
+function serviceCat(s) { if (!s) return 'Não informado'; if (/corretagem/i.test(s)) return 'Outros serviços'; if (/plano/i.test(s)) return 'Plano de Saúde'; /* testar antes: o texto dos planos cita “hospitalar” */ if (/hospita/i.test(s)) return 'Serviço Hospitalar'; return 'Outros serviços'; }
+const fmtCnpj = d => d.length === 14 ? d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : d;
+
+/* Tributos exibidos. k = propriedade na NFS-e (centavos). ISSQN é a base (ic); os demais vêm das colunas do relatório Completo. */
+const TAXES = [
+  { k: 'ic',   label: 'ISSQN', short: 'ISSQN' },
+  { k: 'irrf', label: 'IRRF', short: 'IRRF' },
+  { k: 'csll', label: 'Contrib. Sociais Ret. (CSLL)', short: 'CSLL' },
+  { k: 'inss', label: 'Contrib. Previd. Ret. (INSS)', short: 'INSS' },
+  { k: 'cbs',  label: 'CBS', short: 'CBS' },
+  { k: 'ibs',  label: 'IBS', short: 'IBS' },
+];
+const TK = TAXES.map(x => x.k), TAXD = Object.fromEntries(TAXES.map(x => [x.k, x]));
+const zeroRow = key => { const o = { key, vc: 0, n: 0 }; TK.forEach(k => o[k] = 0); return o; };
+const addRow = (o, n) => { o.vc += n.vc; o.n++; for (const k of TK) o[k] += n[k]; };
+
+/* Campos reconhecidos. "std" = estrutura padrão esperada pelo projeto. */
+const FIELDS = [
+  { id: 'chave', label: 'Chave da Nota',   std: true,  role: 'Identificador (chave de relação)', al: ['chavedanota', 'chavenfse', 'chave', 'chavedeacesso', 'chaveacesso'] },
+  { id: 'num',   label: 'Nº NFS-e',        std: true,  role: 'Identificador',                    al: ['nnfse', 'numeronfse', 'nnfs', 'ndanotafiscal', 'nnotafiscal', 'numerodanota', 'numerodanfse', 'numero'] },
+  { id: 'comp',  label: 'Competência',     std: true,  role: 'Data / período',                   al: ['competencia'] },
+  { id: 'dgen',  label: 'Data de Emissão', std: false, role: 'Data (gráficos por dia e semana)', al: ['datadeemissao', 'dataemissao', 'datageracao', 'emissao'] },
+  { id: 'doc',   label: 'CPF/CNPJ',        std: true,  role: 'Categoria (documento do tomador)', al: ['cpfcnpj', 'cnpjcpf', 'cnpjcpftomador', 'cnpj', 'cpf', 'documento'] },
+  { id: 'tom',   label: 'Tomador',         std: true,  role: 'Categoria',                        al: ['tomador', 'nometomador'] },
+  { id: 'sit',   label: 'Situação',        std: true,  role: 'Categoria',                        al: ['situacao', 'status'] },
+  { id: 'op',    label: 'Operação',        std: true,  role: 'Categoria (descrição do serviço)', al: ['operacao'] },
+  { id: 'vlr',   label: 'Vlr. Serviço',    std: true,  role: 'Métrica (R$)',                     al: ['vlrservico', 'valordoservicor', 'vlrdoservico', 'valordoservico', 'valorservico'] },
+  { id: 'iss',   label: 'Vlr. ISSQN',      std: true,  role: 'Métrica (R$)',                     al: ['vlrissqn', 'valordoissqnr', 'vlriss', 'valorissqn', 'valoriss'] },
+  { id: 'base',  label: 'Base de Cálculo', std: false, role: 'Métrica (R$)',                     al: ['basedecalculo', 'basedecalculor', 'basecalculo'] },
+  { id: 'aliq',  label: 'Alíquota ISS',    std: false, role: 'Métrica, só para conferência',     al: ['aliquotaiss', 'aliquotaissqn', 'aliq', 'aliquota'] },
+  { id: 'ret',   label: 'ISS Retido',      std: false, role: 'Categoria (retenção do ISSQN)',    al: ['issretido', 'retencaoissqn'] },
+  { id: 'liq',   label: 'Valor Líquido',   std: false, role: 'Métrica (R$)',                     al: ['valorliquido'] },
+  { id: 'irrf',  label: 'IRRF',            std: false, role: 'Tributo (R$)',                     al: ['irrf', 'irrfr'] },
+  { id: 'csll',  label: 'CSLL',            std: false, role: 'Tributo (R$)',                     al: ['csll', 'contribsociaisretr'] },
+  { id: 'inss',  label: 'CP (INSS)',       std: false, role: 'Tributo (R$)',                     al: ['cpinss', 'contribprevidretr'] },
+  { id: 'cbs',   label: 'CBS',             std: false, role: 'Tributo (R$)',                     al: ['valorcbstotalr', 'valorcbstotal', 'cbs'] },
+  { id: 'ibs',   label: 'IBS',             std: false, role: 'Tributo (R$)',                     al: ['valoribstotalr', 'valoribstotal', 'ibs'] },
+  { id: 'pis',   label: 'PIS',             std: false, role: 'Conferência (R$)',                 al: ['pis', 'pisdebitor'] },
+  { id: 'cofins',label: 'COFINS',          std: false, role: 'Conferência (R$)',                 al: ['cofins', 'cofinsdebitor'] },
+  { id: 'srv',   label: 'Cód. Serviço (Trib. Nacional)', std: false, role: 'Categoria (código do serviço)', al: ['codservicotribnacional', 'codtributacaonacional', 'nomedoservico', 'servico'] },
+  { id: 'desc',  label: 'Descrição do Serviço (Trib. Nacional)', std: false, role: 'Texto livre (apoia a categoria de serviço)', al: ['descricaodoservicotribnacional', 'descricaodoservico', 'descricao'] },
+  { id: 'nbs',   label: 'Cód. NBS',        std: false, role: 'Texto livre',                      al: ['codnbs'] },
+  { id: 'nbsd',  label: 'Descrição NBS',   std: false, role: 'Texto livre',                      al: ['descricaonbs'] },
+  { id: 'ev',    label: 'Evento',          std: false, role: 'Texto livre',                      al: ['evento'] },
+  { id: 'prest', label: 'CNPJ/CPF Emitente', std: false, role: 'Empresa (CNPJ do emitente)',     al: ['cnpjcpfemitente', 'cnpjcpfprestador'] },
+  { id: 'prestn',label: 'Emitente',        std: false, role: 'Empresa (nome do emitente)',       al: ['emitente', 'nomeemitente', 'nomeprestador'] },
+];
+
+/* Valor monetário: aceita número, "1.234,56", "1234.56", "R$ 1.234,56", "(10,00)". Retorna null se inválido. */
+function parseMoney(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  let s = String(v).trim().replace(/R\$\s*/i, '').replace(/\s/g, '');
+  if (!s) return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+  if (s[0] === '-') { neg = !neg; s = s.slice(1); }
+  const hasC = s.includes(','), hasD = s.includes('.');
+  if (hasC && hasD) s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else if (hasC) s = s.replace(',', '.');
+  else if (hasD && /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  if (!/^\d*\.?\d+$|^\d+\.$/.test(s)) return null;
+  const n = Number(s);
+  return isFinite(n) ? (neg ? -n : n) : null;
+}
+
+function mkDate(y, m, d) {
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return { iso: `${y}-${pad2(m)}-${pad2(d)}`, ym: `${y}-${pad2(m)}` };
+}
+/* Datas: dd/mm/aaaa, aaaa-mm-dd, mm/aaaa, serial do Excel, Date. */
+function parseDate(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return isNaN(v) ? null : mkDate(v.getFullYear(), v.getMonth() + 1, v.getDate());
+  if (typeof v === 'number') {
+    if (v > 20000 && v < 100000) { const p = XLSX.SSF.parse_date_code(v); return p ? mkDate(p.y, p.m, p.d) : null; }
+    return null;
+  }
+  const s = String(v).trim(); let m;
+  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return mkDate(+m[3], +m[2], +m[1]);
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return mkDate(+m[1], +m[2], +m[3]);
+  if ((m = s.match(/^(\d{1,2})\/(\d{4})$/))) { const r = mkDate(+m[2], +m[1], 1); return r ? { ...r, monthOnly: true } : null; }
+  return null;
+}
+
+/* Lê a aba mesmo que a dimensão declarada no XML esteja errada (ex.: <dimension ref="A1"/>). */
+function sheetRows(ws) {
+  let R = -1, C = -1;
+  for (const k in ws) { if (k.charCodeAt(0) === 33) continue; const a = XLSX.utils.decode_cell(k); if (a.r > R) R = a.r; if (a.c > C) C = a.c; }
+  if (R < 0) return [];
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: R, c: C } });
+  return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
+}
+
+function findHeader(rows) {
+  const lim = Math.min(rows.length, 120); let best = -1, score = 0;
+  for (let i = 0; i < lim; i++) {
+    const set = new Set();
+    (rows[i] || []).forEach(c => { const n = norm(c); if (n) for (const f of FIELDS) if (f.al.includes(n)) set.add(f.id); });
+    if (set.has('vlr') && (set.has('chave') || set.has('num')) && set.size > score) { best = i; score = set.size; if (set.size >= 8) break; }
+  }
+  return best;
+}
+function mapColumns(row) {
+  const cols = {}, unknown = [];
+  (row || []).forEach((c, idx) => {
+    const n = norm(c); if (!n) return;
+    const f = FIELDS.find(f => !(f.id in cols) && f.al.includes(n));
+    if (f) cols[f.id] = { idx, header: txt(c) }; else unknown.push(txt(c));
+  });
+  return { cols, unknown };
+}
+function extractMeta(rows) {
+  const m = {}; let x;
+  for (const r of rows) {
+    const t = txt(r && r[0]); if (!t) continue;
+    if ((x = t.match(/Per[ií]odo de Compet[eê]ncia:\s*(\d{2}\/\d{2}\/\d{4})\s*(?:à|a|até|ate)\s*(\d{2}\/\d{2}\/\d{4})/i))) { m.periodoDe = x[1]; m.periodoAte = x[2]; }
+    else if ((x = t.match(/^CPF\/CNPJ:\s*(.+)$/i))) m.cnpj = x[1].trim();
+    else if ((x = t.match(/^Nome\/Raz[aã]o Social:\s*(.+)$/i))) m.empresa = x[1].trim();
+    else if (/^PREFEITURA/i.test(t)) m.prefeitura = t;
+    else if ((x = t.match(/^Situa[cç][aã]o:\s*(.+)$/i))) m.situacaoRel = x[1].trim();
+    else if ((x = t.match(/Data de Emiss[aã]o:\s*(\d{2}\/\d{2}\/\d{4})/i))) m.emissao = x[1];
+  }
+  return m;
+}
+
+function parseRows(rows, filename, sheetName) {
+  const hi = findHeader(rows); if (hi < 0) return null;
+  const { cols, unknown } = mapColumns(rows[hi]);
+  const kind = 'lote';
+  const TXF = ['irrf', 'csll', 'inss', 'cbs', 'ibs', 'pis', 'cofins'];
+  const rep = { rowsRead: 0, skipped: { blank: 0, subtotal: 0, footer: 0, other: 0 }, dupInFile: 0, dups: [], keyInvalid: 0, badKeyRows: [], badValue: [], badTax: [],
+    nullsTom: 0, nullsDoc: 0, nullsDate: 0, nullsIss: 0, nullsSit: 0, nullsOp: 0, nullsRet: 0, nullsNum: 0, ffill: 0 };
+  const records = [], seen = new Set(); let footer = null;
+  for (let r = hi + 1; r < rows.length; r++) {
+    const row = rows[r] || []; rep.rowsRead++;
+    const g = f => cols[f] ? row[cols[f].idx] : null;
+    const chave = txt(g('chave')).replace(/\s+/g, ''), num = txt(g('num'));
+    /* Só é "chave" quem parece número (inclui notação científica de CSV); o resto é rodapé/subtotal. */
+    const keyish = !chave || /^[0-9.,eE+\-]+$/.test(chave);
+    if ((!chave && !num) || !keyish) {
+      const joined = row.map(txt).filter(Boolean).join(' ');
+      if (!joined) rep.skipped.blank++;
+      else if (/valor total|\btotal\b/i.test(joined) && parseMoney(g('vlr')) !== null) {
+        rep.skipped.footer++;
+        const q = f => cols[f] ? cents(parseMoney(g(f))) : null, nn = joined.match(/\((\d+)\s+notas?\)/i);
+        footer = { vc: q('vlr'), ic: q('iss'), bc: q('base'), irrf: q('irrf'), csll: q('csll'), inss: q('inss'), cbs: q('cbs'), ibs: q('ibs'), pis: q('pis'), cofins: q('cofins'), n: nn ? +nn[1] : null, row: r + 1 };
+      }
+      else if (/\btotais?\b/i.test(joined)) rep.skipped.subtotal++;
+      else if (/^objeto:|data de emiss/i.test(joined)) rep.skipped.footer++;
+      else rep.skipped.other++;
+      continue;
+    }
+    const vRaw = g('vlr'), v = parseMoney(vRaw);
+    if (v === null) { rep.badValue.push({ row: r + 1, num, val: txt(vRaw) }); continue; }
+    const tom = txt(g('tom')), doc = txt(g('doc'));
+    let key = chave; const keyOk = /^\d{50}$/.test(chave);
+    if (keyOk) { if (seen.has(key)) { rep.dupInFile++; rep.dups.push(num || key.slice(-8)); continue; } seen.add(key); }
+    else { rep.keyInvalid++; if (rep.badKeyRows.length < 20) rep.badKeyRows.push({ row: r + 1, num, chave }); key = 'INVALIDA:' + filename + ':' + (r + 1); }
+    /* Data dos gráficos = Data de Emissão; sem ela, usa a Competência. A competência (mês/ano) vem da coluna Competência. */
+    const dd = parseDate(g('dgen')), dc = parseDate(g('comp')), d = dd || dc, ym = (dc && dc.ym) || (dd && dd.ym) || null;
+    const iv = parseMoney(g('iss')), bv = cols.base ? parseMoney(g('base')) : null, av = cols.aliq ? parseMoney(g('aliq')) : null, lv = cols.liq ? parseMoney(g('liq')) : null;
+    const sit = txt(g('sit')), op = txt(g('op')), ret = txt(g('ret'));
+    const tx = {};
+    for (const k of TXF) { const raw = g(k), pv = parseMoney(raw); if (raw !== null && raw !== undefined && txt(raw) !== '' && pv === null) rep.badTax.push({ row: r + 1, num, campo: k, val: txt(raw) }); tx[k] = pv === null ? 0 : cents(pv); }
+    if (!tom) rep.nullsTom++; if (!doc) rep.nullsDoc++; if (!d) rep.nullsDate++; if (iv === null) rep.nullsIss++;
+    if (!sit) rep.nullsSit++; if (!op) rep.nullsOp++; if (!ret) rep.nullsRet++; if (!num) rep.nullsNum++;
+    const docD = doc.replace(/\D/g, '');
+    const empD = cols.prest ? txt(g('prest')).replace(/\D/g, '') : '', empRaw = cols.prestn ? txt(g('prestn')) : '';
+    records.push({
+      key, keyOk, num, numInt: parseInt(num.replace(/\D/g, ''), 10) || 0,
+      date: d ? d.iso : null, ym, monthOnly: !!(!dd && dc && dc.monthOnly),
+      doc, docD, contr: contrOf(docD), tipo: docD.length === 11 ? 'Pessoa física' : docD.length === 14 ? 'Pessoa jurídica' : 'Não identificado',
+      tom: tom || '(não informado)', tomRaw: tom, tomKey: docD || ('N:' + (norm(tom) || 'sem-tomador')),
+      sit: sit || '(não informada)', op: op || '(não informada)', ret: ret || '(não informada)',
+      vc: cents(v), ic: iv === null ? 0 : cents(iv), issNull: iv === null, bc: bv === null ? null : cents(bv), aliq: av, liq: lv === null ? null : cents(lv),
+      irrf: tx.irrf, csll: tx.csll, inss: tx.inss, cbs: tx.cbs, ibs: tx.ibs, pis: tx.pis, cofins: tx.cofins,
+      srv: txt(g('srv')), desc: txt(g('desc')), ev: txt(g('ev')), nbs: [txt(g('nbs')), txt(g('nbsd'))].filter(Boolean).join(' - '), emp: empD, empNameRaw: empRaw, row: r + 1, src: filename,
+    });
+  }
+  const meta = extractMeta(rows.slice(0, hi).concat(rows.slice(-8)));
+  /* Empresa emitente de cada nota: coluna CNPJ/CPF Emitente; sem ela, o CNPJ embutido na chave (posições 10 a 23). A identidade da empresa é o CNPJ. */
+  const fbMeta = (meta.cnpj || '').replace(/\D/g, '');
+  for (const r of records) if (r.emp.length !== 14) r.emp = r.keyOk ? r.key.slice(9, 23) : (fbMeta.length === 14 ? fbMeta : 'sem-cnpj');
+  const grp = new Map();
+  for (const r of records) { let e = grp.get(r.emp); if (!e) grp.set(r.emp, e = { emp: r.emp, n: 0, vc: 0, nm: new Map() }); e.n++; e.vc += r.vc; if (r.empNameRaw) e.nm.set(r.empNameRaw, (e.nm.get(r.empNameRaw) || 0) + 1); }
+  const emps = [...grp.values()].map(e => { const names = [...e.nm.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])); return { emp: e.emp, n: e.n, vc: e.vc, names, name: names.length ? names[0][0] : fmtCnpj(e.emp) }; }).sort((a, b) => b.n - a.n);
+  const nmOf = new Map(emps.map(e => [e.emp, e.name]));
+  records.forEach(r => { r.empName = nmOf.get(r.emp); });
+  const emp = emps.length ? emps[0].emp : 'sem-cnpj', empName = emps.length ? emps[0].name : '';
+  meta.empresa = empName; meta.cnpj = fmtCnpj(emp);
+  return { name: filename, kind, sheet: sheetName, headerRow: hi + 1, cols, unknown, records, rep, footer, meta, emp, empName, emps };
+}
+
+/* Aba "Resumo": pares rótulo/valor no topo e a tabela "Conferência de totais" (Planilha × Controle). */
+function parseResumo(wb) {
+  const sn = wb.SheetNames.find(s => /resumo/i.test(s)); if (!sn) return null;
+  const rows = sheetRows(wb.Sheets[sn]), info = {}, control = {};
+  const hi = rows.findIndex(r => r && norm(r[0]) === 'indicador');
+  rows.forEach((r, i) => { r = r || []; const k = txt(r[0]); if (!k || (hi >= 0 && i >= hi)) return; const v = r[1]; if (v !== null && v !== undefined && txt(v) !== '') info[k] = txt(v); });
+  if (hi >= 0) for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || [], k = txt(r[0]); if (!k) break;
+    const sheet = parseMoney(r[1]), ctrl = parseMoney(r[2]); if (sheet === null && ctrl === null) break;
+    control[k] = { sheet, ctrl };
+  }
+  return Object.keys(control).length ? { info, control } : null;
+}
+/* Aba "Log": avisos gerados na leitura dos XMLs. */
+function parseLog(wb) {
+  const sn = wb.SheetNames.find(s => /^log$/i.test(s)); if (!sn) return null;
+  const rows = sheetRows(wb.Sheets[sn]), hi = rows.findIndex(r => r && norm(r[0]) === 'nivel'); if (hi < 0) return null;
+  const by = new Map(), notes = new Set(); let total = 0;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i] || [], msg = txt(r[4]); if (!msg) continue;
+    total++; notes.add(txt(r[2]) || txt(r[3]));
+    const k = msg.replace(/-?\d+(?:[.,]\d+)?/g, '#'); by.set(k, (by.get(k) || 0) + 1);
+  }
+  return { total, notes: notes.size, byType: [...by.entries()].sort((a, b) => b[1] - a[1]) };
+}
+
+function parseWorkbook(wb, filename) {
+  const tried = [];
+  for (const sn of wb.SheetNames) {
+    const rows = sheetRows(wb.Sheets[sn]);
+    const src = parseRows(rows, filename, sn);
+    if (src) { src.resumo = parseResumo(wb); src.log = parseLog(wb); return src; }
+    const sample = rows.find(r => r && r.filter(c => c !== null && c !== '').length >= 3);
+    tried.push({ sheet: sn, rows: rows.length, sample: sample ? sample.map(txt).filter(Boolean).slice(0, 12) : [] });
+  }
+  return { error: true, name: filename, tried };
+}
+
+/* Une as fontes pela Chave da Nota. A Sintética tem prioridade; a Analítica completa campos extras. */
+function rebuild(sources, empFilter = null) {
+  const ordered = [...sources].sort((a, b) => (a.kind === 'sintetica' ? 0 : 1) - (b.kind === 'sintetica' ? 0 : 1));
+  const map = new Map();
+  const cross = { kinds: [...new Set(sources.map(s => s.kind))], repeatSameKind: 0, divV: 0, divI: 0, divSit: 0, divOp: 0, divTom: 0, divDate: 0, examples: [] };
+  for (const src of ordered) {
+    for (const r of src.records) {
+      if (empFilter && r.emp !== empFilter) continue;
+      const ex = r.keyOk ? map.get(r.key) : null;
+      if (!ex) { map.set(r.key, { ...r, inS: src.kind === 'sintetica', inA: src.kind === 'analitica' }); continue; }
+      if ((src.kind === 'sintetica' && ex.inS) || (src.kind === 'analitica' && ex.inA)) { cross.repeatSameKind++; continue; }
+      const diffs = [];
+      if (ex.vc !== r.vc) { cross.divV++; diffs.push('Vlr. Serviço'); }
+      if (ex.ic !== r.ic) { cross.divI++; diffs.push('ISSQN'); }
+      if (ex.sit !== r.sit) { cross.divSit++; diffs.push('Situação'); }
+      if (ex.op !== r.op) { cross.divOp++; diffs.push('Operação'); }
+      if (ex.docD !== r.docD || fold(ex.tomRaw) !== fold(r.tomRaw)) { cross.divTom++; diffs.push('Tomador'); }
+      if (ex.date !== r.date) { cross.divDate++; diffs.push('Data'); }
+      if (diffs.length && cross.examples.length < 15) cross.examples.push({ num: ex.num, campos: diffs });
+      for (const f of ['bc', 'aliq', 'srv', 'desc']) if ((ex[f] === null || ex[f] === '' || ex[f] === undefined) && r[f] !== null && r[f] !== '' && r[f] !== undefined) ex[f] = r[f];
+      if (src.kind === 'sintetica') ex.inS = true; else ex.inA = true;
+    }
+  }
+  const notes = [...map.values()];
+  const byKey = new Map();
+  for (const n of notes) { n.cat = (n.op && !/n[aã]o mapeado|n[aã]o informada/i.test(n.op)) ? serviceCat(n.op) : serviceCat(n.srv + ' ' + n.desc); if (n.cat !== 'Plano de Saúde') n.contr = '';   /* contratação só existe para Plano de Saúde */ n.hay = fold([n.num, n.tom, n.doc, n.docD, n.key, n.srv].join(' ')); byKey.set(n.key, n); }
+  /* Tomadores: identidade = CPF/CNPJ (ou nome, se não houver documento). */
+  const tom = new Map();
+  for (const n of notes) {
+    let t = tom.get(n.tomKey);
+    if (!t) { t = { key: n.tomKey, doc: n.doc, tipo: n.tipo, names: new Map(), vc: 0, n: 0 }; tom.set(n.tomKey, t); }
+    t.names.set(n.tom, (t.names.get(n.tom) || 0) + 1); t.vc += n.vc; t.n++;
+  }
+  const nameCount = new Map();
+  for (const t of tom.values()) { t.name = [...t.names.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0]; nameCount.set(t.name, (nameCount.get(t.name) || 0) + 1); }
+  for (const t of tom.values()) { t.label = (nameCount.get(t.name) > 1 && t.doc) ? `${t.name} (${t.doc})` : t.name; t.hay = fold(t.label + ' ' + t.doc + ' ' + t.name) + ' ' + String(t.doc).replace(/\D/g, ''); }
+  /* Valores disponíveis para filtros. */
+  const cnt = (fn) => { const m = new Map(); for (const n of notes) { const k = fn(n); const o = m.get(k) || { v: k, n: 0, vc: 0 }; o.n++; o.vc += n.vc; m.set(k, o); } return [...m.values()].sort((a, b) => b.vc - a.vc); };
+  const dates = notes.map(n => n.date).filter(Boolean).sort();
+  const avail = {
+    sit: cnt(n => n.sit), ret: cnt(n => n.ret), contr: cnt(n => n.contr).filter(x => x.v), cat: cnt(n => n.cat),
+    months: [...new Set(notes.map(n => n.ym).filter(Boolean))].sort(),
+    minDate: dates[0] || '', maxDate: dates[dates.length - 1] || '',
+    anyMonthOnly: notes.some(n => n.monthOnly), hasBase: notes.some(n => n.bc !== null), hasLiq: notes.some(n => n.liq !== null),
+    tax: Object.fromEntries(TAXES.map(x => [x.k, x.k === 'ic' || notes.some(n => n[x.k] !== 0)])),
+  };
+  if (cross.kinds.length > 1) {
+    cross.both = notes.filter(n => n.inS && n.inA).length;
+    cross.onlyS = notes.filter(n => n.inS && !n.inA).length;
+    cross.onlyA = notes.filter(n => n.inA && !n.inS).length;
+  }
+  return { notes, byKey, tom, avail, cross };
+}
+
+function companiesOf(sources) {
+  const m = new Map();
+  for (const s of sources) for (const e of s.emps) {
+    let c = m.get(e.emp); if (!c) { c = { emp: e.emp, name: e.name, cnpj: fmtCnpj(e.emp), files: [], n: 0, vc: 0, nm: new Map() }; m.set(e.emp, c); }
+    if (!c.files.includes(s.name)) c.files.push(s.name); c.n += e.n; c.vc += e.vc;
+    e.names.forEach(([nm, k]) => c.nm.set(nm, (c.nm.get(nm) || 0) + k));
+  }
+  for (const c of m.values()) { c.names = [...c.nm.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])); if (c.names.length) c.name = c.names[0][0]; delete c.nm; }
+  return [...m.values()].sort((a, b) => b.vc - a.vc);
+}
+function defaultFilters(avail) {
+  return { q: '', qw: [], month: '', from: '', to: '',
+    sit: new Set(avail.sit.filter(x => !isCancel(x.v)).map(x => x.v)),
+    ret: new Set(avail.ret.map(x => x.v)), contr: new Set(avail.contr.map(x => x.v)), cat: new Set(avail.cat.map(x => x.v)),
+    tom: new Set(), min: null, max: null };
+}
+function passes(n, F, o) {
+  o = o || {};
+  if (!o.noDate) {
+    if (F.month && n.ym !== F.month) return false;
+    if (F.from && (!n.date || n.date < F.from)) return false;
+    if (F.to && (!n.date || n.date > F.to)) return false;
+  }
+  if (!o.noSit && !F.sit.has(n.sit)) return false;
+  if (!F.ret.has(n.ret)) return false;
+  if (n.contr && !F.contr.has(n.contr)) return false;   /* serviços fora de Plano de Saúde não têm contratação */
+  if (!F.cat.has(n.cat)) return false;
+  if (!o.noTom && F.tom.size && !F.tom.has(n.tomKey)) return false;
+  if (F.min !== null && n.vc < Math.round(F.min * 100)) return false;
+  if (F.max !== null && n.vc > Math.round(F.max * 100)) return false;
+  if (F.qw.length) for (const w of F.qw) if (!n.hay.includes(w)) return false;
+  return true;
+}
+
+function summarize(list) {
+  let vc = 0, bc = 0, nb = 0, max = 0; const t = new Set(), s = { cnt: {} }; TK.forEach(k => { s[k] = 0; s.cnt[k] = 0; });
+  for (const n of list) { vc += n.vc; for (const k of TK) { s[k] += n[k]; if (n[k]) s.cnt[k]++; } t.add(n.tomKey); if (n.bc !== null) { bc += n.bc; nb++; } if (n.vc > max) max = n.vc; }
+  return Object.assign(s, { n: list.length, vc, bc, nb, tom: t.size, max });
+}
+function groupBy(list, keyFn) {
+  const m = new Map();
+  for (const n of list) { const k = keyFn(n); if (k === null || k === undefined) continue; let g = m.get(k); if (!g) { g = zeroRow(k); m.set(k, g); } addRow(g, n); }
+  return [...m.values()];
+}
+
+/* Períodos */
+const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const fmtDate = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '—';
+const fmtComp = ym => ym ? ym.slice(5) + '/' + ym.slice(0, 4) : '—';
+function addDays(iso, k) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); }
+function nextMonth(ym) { let [y, m] = ym.split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return y + '-' + pad2(m); }
+function monthEnd(ym) { const [y, m] = ym.split('-').map(Number); return ym + '-' + pad2(new Date(Date.UTC(y, m, 0)).getUTCDate()); }
+function mondayOf(iso) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); }
+const bucketOf = (n, g) => !n.date ? null : g === 'mes' ? n.ym : g === 'semana' ? mondayOf(n.date) : n.date;
+function seriesByPeriod(list, g) {
+  const m = new Map(); let skipped = 0;
+  for (const n of list) {
+    const k = bucketOf(n, g); if (k === null) { skipped++; continue; }
+    let b = m.get(k); if (!b) { b = zeroRow(k); m.set(k, b); } addRow(b, n);
+  }
+  if (!m.size) return { rows: [], skipped };
+  const keys = [...m.keys()].sort(), last = keys[keys.length - 1], out = []; let k = keys[0], guard = 0;
+  while (k <= last && guard++ < 4000) { out.push(m.get(k) || zeroRow(k)); k = g === 'mes' ? nextMonth(k) : addDays(k, g === 'semana' ? 7 : 1); }
+  return { rows: out, skipped };
+}
+
+/* Validação consolidada (independe dos filtros) */
+function buildValidation(sources, notes, cross, meta, tom) {
+  const V = { files: [], quality: [], recon: [], resumo: [], cross: null };
+  const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+  const Q = (label, value, status, detail, alert) => V.quality.push({ label, value, status, detail: detail || '', alert: !!alert });
+  const nfmt = x => x.toLocaleString('pt-BR');
+  const brl = c => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  for (const s of sources) V.files.push({ name: s.name, kind: s.kind, sheet: s.sheet, headerRow: s.headerRow, rowsRead: s.rep.rowsRead, valid: s.records.length, skipped: s.rep.skipped, dup: s.rep.dupInFile, badValue: s.rep.badValue.length, keyInvalid: s.rep.keyInvalid });
+  const R = f => sum(sources, s => f(s.rep));
+  const kindName = () => 'Lote NNAC';
+
+  Q('NFS-e analisadas (chaves únicas)', nfmt(notes.length), 'info', sources.map(s => `${kindName(s.kind)}: ${nfmt(s.records.length)}`).join(', '));
+  const dup = R(r => r.dupInFile) + cross.repeatSameKind;
+  Q('Chaves da Nota duplicadas', nfmt(dup), dup ? 'warn' : 'ok', dup ? 'Repetições foram descartadas (vale a primeira ocorrência). Nºs: ' + sources.flatMap(s => s.rep.dups).slice(0, 10).join(', ') : 'Nenhuma chave repetida.', dup > 0);
+  const ki = R(r => r.keyInvalid);
+  Q('Chaves inválidas (diferentes de 50 dígitos)', nfmt(ki), ki ? 'err' : 'ok', ki ? 'Linhas mantidas com chave provisória: ' + sources.flatMap(s => s.rep.badKeyRows).slice(0, 5).map(x => `linha ${x.row} (nº ${x.num || '—'})`).join(', ') + '. Em CSV, confira se o Excel não converteu a chave em notação científica.' : 'Todas as chaves têm 50 dígitos.', ki > 0);
+  const bv = R(r => r.badValue.length);
+  Q('Vlr. Serviço ausente ou inválido', nfmt(bv), bv ? 'err' : 'ok', bv ? 'Linhas excluídas dos totais: ' + sources.flatMap(s => s.rep.badValue).slice(0, 5).map(x => `linha ${x.row} (“${x.val}”)`).join(', ') : 'Todos os valores são numéricos.', bv > 0);
+  const ni = R(r => r.nullsIss);
+  Q('Vlr. ISSQN ausente ou inválido', nfmt(ni), ni ? 'warn' : 'ok', ni ? 'Tratado como R$ 0,00 nos totais.' : 'Todos os valores são numéricos.');
+  const nd = R(r => r.nullsDate);
+  Q('Datas ausentes ou inválidas', nfmt(nd), nd ? 'warn' : 'ok', nd ? 'Essas notas entram nos totais, mas ficam fora dos gráficos por período.' : 'Todas as datas foram reconhecidas.');
+  const nc = { Tomador: R(r => r.nullsTom), 'CPF/CNPJ': R(r => r.nullsDoc), Situação: R(r => r.nullsSit), Operação: R(r => r.nullsOp), 'Retenção ISSQN': R(r => r.nullsRet), 'Nº NFS-e': R(r => r.nullsNum) };
+  const ncT = Object.values(nc).reduce((a, b) => a + b, 0);
+  Q('Campos de categoria vazios', nfmt(ncT), ncT ? 'warn' : 'ok', ncT ? Object.entries(nc).filter(e => e[1]).map(e => `${e[0]}: ${e[1]}`).join(', ') : 'Tomador, CPF/CNPJ, Situação, Operação, Retenção ISSQN e Nº preenchidos em todas as notas.');
+  const nonPos = notes.filter(n => n.vc <= 0).length;
+  Q('Vlr. Serviço zerado ou negativo', nfmt(nonPos), nonPos ? 'warn' : 'ok', nonPos ? 'Mantidas nos totais.' : 'Nenhum.');
+  const issGt = notes.filter(n => n.ic > n.vc).length;
+  Q('ISSQN maior que o Vlr. Serviço', nfmt(issGt), issGt ? 'warn' : 'ok', issGt ? 'Possível erro de digitação na origem.' : 'Nenhum.');
+  const issZero = notes.filter(n => n.ic === 0 && n.vc > 0);
+  if (issZero.length) { const by = {}; issZero.forEach(n => by[n.ret] = (by[n.ret] || 0) + 1); Q('NFS-e com ISSQN zerado e valor positivo', nfmt(issZero.length), 'info', Object.entries(by).map(e => `${e[0]}: ${e[1]}`).join(', ') + ' (valor total ' + brl(sum(issZero, n => n.vc)) + ')'); }
+  if (meta.periodoDe && meta.periodoAte) {
+    const iso = s => s.slice(6) + '-' + s.slice(3, 5) + '-' + s.slice(0, 2), a = iso(meta.periodoDe), b = iso(meta.periodoAte);
+    const out = notes.filter(n => n.date && (n.date < a || n.date > b)).length;
+    Q('Datas fora do período do relatório', nfmt(out), out ? 'warn' : 'ok', `Período informado no cabeçalho: ${meta.periodoDe} a ${meta.periodoAte}.`);
+  }
+  Q('Competências encontradas', nfmt(new Set(notes.map(n => n.ym).filter(Boolean)).size), 'info', [...new Set(notes.map(n => n.ym).filter(Boolean))].sort().map(fmtComp).join(', ') + '. A competência e as datas dos gráficos vêm das colunas Competência e Data de Emissão.');
+  const multiName = [...tom.values()].filter(t => t.names.size > 1);
+  Q('CPF/CNPJ com mais de um nome', nfmt(multiName.length), multiName.length ? 'warn' : 'ok', multiName.length ? multiName.slice(0, 3).map(t => `${t.doc}: ${[...t.names.keys()].join(' / ')}`).join('; ') + '. Agrupado pelo documento, usando o nome mais frequente.' : 'Cada documento aparece com um único nome.');
+  const nameMap = new Map(); for (const t of tom.values()) { if (!nameMap.has(t.name)) nameMap.set(t.name, []); nameMap.get(t.name).push(t.doc); }
+  const multiDoc = [...nameMap.entries()].filter(e => e[1].length > 1);
+  Q('Nomes com mais de um CPF/CNPJ', nfmt(multiDoc.length), multiDoc.length ? 'info' : 'ok', multiDoc.length ? multiDoc.slice(0, 3).map(e => `${e[0]} (${e[1].length} documentos)`).join('; ') + '. Tratados como tomadores distintos (filiais).' : 'Nenhum.');
+  const pj = [...tom.values()].filter(t => t.tipo === 'Pessoa jurídica').length, pf = [...tom.values()].filter(t => t.tipo === 'Pessoa física').length;
+  Q('Tomadores distintos (por CPF/CNPJ)', nfmt(tom.size), 'info', `${nfmt(pj)} pessoas jurídicas e ${nfmt(pf)} pessoas físicas.`);
+  const cc = {}; notes.filter(n => n.contr).forEach(n => cc[n.contr] = (cc[n.contr] || 0) + 1);
+  Q('Tipo de contratação (só Plano de Saúde; regra pelo documento do tomador)', Object.entries(cc).map(e => `${e[0]}: ${nfmt(e[1])}`).join(', '), cc['Não identificado'] ? 'warn' : 'info', `CPF = ${CONTR.ind}; CNPJ = ${CONTR.emp}; CNPJ ${fmtCnpj(ADESAO_CNPJS[0])} = ${CONTR.ade}. Contagem em NFS-e.`);
+  const sc = {}; notes.forEach(n => sc[n.cat] = (sc[n.cat] || 0) + 1);
+  Q('Tipo de serviço (derivado da Operação)', Object.entries(sc).map(e => `${e[0]}: ${nfmt(e[1])}`).join(', '), sc['Não informado'] ? 'warn' : 'info', 'Textos contendo “plano” = Plano de Saúde; os demais contendo “hospital/hospitais” = Serviço Hospitalar.');
+  const sk = { subtotal: R(r => r.skipped.subtotal), footer: R(r => r.skipped.footer), blank: R(r => r.skipped.blank), other: R(r => r.skipped.other) };
+  Q('Linhas ignoradas (não são notas)', nfmt(sk.subtotal + sk.footer + sk.blank + sk.other), sk.other ? 'warn' : 'info', `Subtotais “Totais”: ${nfmt(sk.subtotal)}; rodapé: ${nfmt(sk.footer)}; em branco: ${nfmt(sk.blank)}; outras: ${nfmt(sk.other)}.`);
+  const ff = R(r => r.ffill);
+  if (ff) Q('Tomador herdado do grupo (Analítica)', nfmt(ff), 'info', 'A Analítica informa o tomador só na primeira nota de cada grupo; as demais herdam o da linha anterior do grupo.');
+  const withAliq = notes.filter(n => n.aliq !== null && n.ic > 0);
+  if (withAliq.length) {
+    const z = withAliq.filter(n => n.aliq === 0).length;
+    Q('Coluna Alíq. (%) igual a zero com ISSQN positivo', nfmt(z) + ' de ' + nfmt(withAliq.length), z ? 'warn' : 'ok', z ? 'A coluna não é confiável e não é usada em nenhum cálculo. A alíquota efetiva é ISSQN ÷ Base de cálculo.' : '');
+  }
+  const wb = notes.filter(n => n.bc && n.ic > 0);
+  if (wb.length) {
+    const rates = new Map(); wb.forEach(n => { const k = (n.ic / n.bc * 100).toFixed(2); rates.set(k, (rates.get(k) || 0) + 1); });
+    const top = [...rates.entries()].sort((a, b) => b[1] - a[1]);
+    Q('Alíquota efetiva (ISSQN ÷ Base de cálculo)', top[0][0].replace('.', ',') + '% em ' + nfmt(top[0][1]) + ' notas', top.length > 1 ? 'info' : 'ok', top.length > 1 ? 'Outras: ' + top.slice(1, 4).map(e => `${e[0].replace('.', ',')}% (${e[1]})`).join(', ') + (top.length > 4 ? '…' : '') : '');
+  }
+  const canc = notes.filter(n => isCancel(n.sit));
+  if (canc.length) Q('NFS-e canceladas', nfmt(canc.length), 'info', `${brl(sum(canc, n => n.vc))} em Vlr. Serviço. Ficam fora dos indicadores por padrão (filtro de Situação).`);
+
+  /* ---- Empresas (emitentes) ---- */
+  const comps = companiesOf(sources), byEmp = groupBy(notes, n => n.emp).sort((a, b) => b.vc - a.vc), cmap = new Map(comps.map(c => [c.emp, c]));
+  Q('Empresas emitentes (por CNPJ/CPF do emitente)', nfmt(byEmp.length), 'info', byEmp.map(x => `${(cmap.get(x.key) || {}).name || x.key} (${fmtCnpj(x.key)}): ${nfmt(x.n)} NFS-e, ${brl(x.vc)}`).join('; ') + '.');
+  const multiNm = comps.filter(c => c.names.length > 1);
+  if (multiNm.length) Q('Mesmo CNPJ emitente com nomes diferentes', nfmt(multiNm.length), 'warn', multiNm.map(c => `${c.cnpj}: ` + c.names.map(([nm, k]) => `“${nm}” (${nfmt(k)})`).join(' | ')).join('; ') + '. O dashboard agrupa pelo CNPJ e usa o nome mais frequente.');
+  const numM = new Map(); notes.forEach(n => { const k = n.emp + '|' + n.num; numM.set(k, (numM.get(k) || 0) + 1); });
+  const rep2 = [...numM.values()].filter(v => v > 1);
+  if (rep2.length) Q('Nº NFS-e repetido no mesmo emitente', `${nfmt(rep2.length)} números (${nfmt(rep2.reduce((a, b) => a + b, 0))} notas)`, 'info', 'As chaves são diferentes, então não são duplicidades e todas as notas foram mantidas.');
+  const nm0 = notes.filter(n => /n[aã]o mapeado/i.test(n.op));
+  if (nm0.length) Q('Operação “Não mapeado”', nfmt(nm0.length), 'warn', `Valor total ${brl(sum(nm0, n => n.vc))}. A classificação da operação não foi definida na origem; a categoria de serviço usa o código e a descrição do serviço.`);
+  const cDiff = notes.filter(n => n.date && n.ym && n.date.slice(0, 7) !== n.ym);
+  if (cDiff.length) Q('Competência em mês diferente da emissão', nfmt(cDiff.length), 'info', 'Gráficos por mês usam a Competência; por dia e semana usam a Data de Emissão.');
+
+  /* ---- Tributos, alíquota e eventos ---- */
+  /* Alíquota ISS: a coluna vem em fração (0,02 = 2%); só entra nesta conferência. */
+  const aN = notes.filter(n => n.aliq !== null), scaleF = aN.length && Math.max(...aN.map(n => n.aliq)) <= 1 ? 100 : 1;
+  const aMap = new Map(); aN.forEach(n => aMap.set(n.aliq, (aMap.get(n.aliq) || 0) + 1));
+  if (aMap.size) Q('Alíquota ISS informada (valores distintos)', nfmt(aMap.size), 'info', [...aMap.entries()].sort((a, b) => b[1] - a[1]).map(e => `${e[0].toLocaleString('pt-BR', { maximumFractionDigits: 6 })} (${nfmt(e[1])})`).join(', ') + (scaleF === 100 ? '. Coluna em fração: 0,02 equivale a 2%.' : '.'));
+  const noA = notes.filter(n => n.aliq === null);
+  if (noA.length) Q('Alíquota ISS ausente', nfmt(noA.length), 'warn', 'Nºs ' + noA.slice(0, 8).map(n => n.num).join(', ') + '. Essas notas ficam fora da conferência Base × Alíquota.');
+  const badIss = notes.filter(n => n.bc !== null && n.aliq !== null && Math.abs(Math.round(n.bc * n.aliq * scaleF / 100) - n.ic) > 1);
+  const effM = new Map(); badIss.filter(n => n.ic > 0 && n.bc).forEach(n => { const k = (n.ic / n.bc * 100).toFixed(2); effM.set(k, (effM.get(k) || 0) + 1); });
+  const effTop = [...effM.entries()].sort((a, b) => b[1] - a[1])[0];
+  Q('ISSQN diferente de Base de cálculo × Alíquota', nfmt(badIss.length), badIss.length ? 'warn' : 'ok', badIss.length ? `Em ${nfmt(badIss.length)} notas (tolerância de R$ 0,01). ` + (effTop ? `Em ${nfmt(effTop[1])} delas o ISSQN equivale a ${effTop[0].replace('.', ',')}% da base, diferente da alíquota informada. ` : '') + 'Os valores foram mantidos como estão na planilha.' : 'O ISSQN confere com a base e a alíquota em todas as notas (tolerância de R$ 0,01).', badIss.length > 0);
+  const lowBase = notes.filter(n => n.bc !== null && n.bc < n.vc);
+  if (lowBase.length) Q('Base de cálculo menor que o Valor do Serviço', nfmt(lowBase.length), 'info', `Diferença total de ${brl(sum(lowBase, n => n.vc - n.bc))}. O faturamento usa o Valor do Serviço; a base só aparece como informação.`);
+  for (const x of TAXES.slice(1).filter(x => sources.some(s => s.cols[x.k]))) { const arr = notes.filter(n => n[x.k]); Q(x.label, brl(sum(arr, n => n[x.k])), 'info', arr.length ? `Informado em ${nfmt(arr.length)} de ${nfmt(notes.length)} NFS-e (todas as situações).` : 'Sem valor em nenhuma NFS-e.'); }
+  const pcN = notes.filter(n => n.pis || n.cofins).length;
+  Q('PIS e COFINS (débito)', pcN ? nfmt(pcN) + ' NFS-e com valor' : 'Zerados', 'info', pcN ? 'Valores presentes na planilha, mas fora dos indicadores.' : 'Sem valor em nenhuma NFS-e; por isso não viraram indicador.');
+  const bt = R(r => r.badTax.length);
+  Q('Valores de tributos inválidos', nfmt(bt), bt ? 'warn' : 'ok', bt ? 'Tratados como R$ 0,00: ' + sources.flatMap(s => s.rep.badTax).slice(0, 5).map(x => `linha ${x.row} (${x.campo}: “${x.val}”)`).join(', ') : 'Todos os valores de tributos são numéricos (célula vazia = R$ 0,00).', bt > 0);
+  const evs = notes.filter(n => n.ev);
+  if (evs.length) { const by = {}; evs.forEach(n => { const k = `${n.ev.replace(/^Evento de /i, '')} (${n.sit})`; by[k] = (by[k] || 0) + 1; }); Q('NFS-e com evento registrado', nfmt(evs.length), 'info', Object.entries(by).map(e => `${e[0]}: ${e[1]}`).join('; ')); }
+  for (const s of sources) if (s.footer && s.footer.n !== null) { const ok = s.footer.n === s.records.length; Q('Quantidade de NFS-e: lida × rodapé', `${nfmt(s.records.length)} × ${nfmt(s.footer.n)}`, ok ? 'ok' : 'err', ok ? 'O rodapé “TOTAL (n notas)” confere com as linhas lidas.' : 'A quantidade lida difere do rodapé de ' + s.name + '.', !ok); }
+
+  /* Conferência com o rodapé "Valor total das notas emitidas" de cada arquivo */
+  for (const s of sources) {
+    if (!s.footer) { if (!s.resumo) V.recon.push({ file: s.name, metric: '—', status: 'warn', text: 'Rodapé de totais não encontrado neste arquivo.' }); continue; }
+    const ex = s.records.filter(r => !isCancel(r.sit));
+    const hasCanc = ex.length !== s.records.length;
+    const mets = [['Faturamento (Vlr. Serviço)', 'vc', s.footer.vc], ['ISSQN', 'ic', s.footer.ic]];
+    if (s.footer.bc !== null && s.cols.base) mets.push(['Base de cálculo', 'bc', s.footer.bc]);
+    for (const x of TAXES.slice(1)) if (s.footer[x.k] !== null && s.footer[x.k] !== undefined && s.cols[x.k]) mets.push([x.label, x.k, s.footer[x.k]]);
+    for (const [name, k, foot] of mets) {
+      const all = sum(s.records, r => r[k] || 0), exc = sum(ex, r => r[k] || 0);
+      let status = 'err', text = 'Diferença em relação ao rodapé: ' + brl(all - foot) + ' (todas) / ' + brl(exc - foot) + ' (sem canceladas).';
+      if (foot === all) { status = 'ok'; text = hasCanc ? 'Confere com a soma de todas as notas, incluindo canceladas.' : 'Confere com a soma das notas.'; }
+      else if (foot === exc) { status = 'ok'; text = 'Confere com a soma das notas sem as canceladas.'; }
+      V.recon.push({ file: s.name, kind: s.kind, metric: name, all, exc, foot, hasCanc, status, text });
+    }
+  }
+  if (cross.kinds.length > 1) {
+    V.cross = { both: cross.both, onlyS: cross.onlyS, onlyA: cross.onlyA, nS: notes.filter(n => n.inS).length, nA: notes.filter(n => n.inA).length,
+      div: { 'Vlr. Serviço': cross.divV, 'Vlr. ISSQN': cross.divI, 'Situação': cross.divSit, 'Operação / Tributação': cross.divOp, 'Tomador / CPF-CNPJ': cross.divTom, 'Data': cross.divDate }, examples: cross.examples };
+  }
+  /* Conferência com a aba Resumo (totais de controle) e avisos da aba Log */
+  for (const s of sources) {
+    if (s.log) Q('Avisos registrados na aba Log', `${nfmt(s.log.total)} avisos em ${nfmt(s.log.notes)} notas`, 'info', s.log.byType.map(([k, n]) => `${k}: ${nfmt(n)}`).join('; ') + '.');
+    if (!s.resumo) continue;
+    const recs = s.records, docs = new Set(recs.map(r => r.tomKey)), vcS = sum(recs, r => r.vc), icS = sum(recs, r => r.ic);
+    const put = (label, kind, dash, res) => { if (res === null || res === undefined) return; const ok = kind === 'money' ? cents(res) === dash : res === dash;
+      V.resumo.push({ file: s.name, label, dash: kind === 'money' ? brl(dash) : nfmt(dash), res: kind === 'money' ? brl(cents(res)) : nfmt(res), status: ok ? 'ok' : 'err' }); };
+    for (const [label, o] of Object.entries(s.resumo.control)) {
+      const v = o.ctrl !== null ? o.ctrl : o.sheet, k = norm(label);
+      if (/^nfse/.test(k)) put(label, 'int', recs.length, v);
+      else if (/^faturamento/.test(k)) put(label, 'money', vcS, v);
+      else if (/^issqn/.test(k)) put(label, 'money', icS, v);
+      else if (/^tomadores/.test(k)) put(label, 'int', new Set(recs.filter(r => r.docD).map(r => r.docD)).size, v);
+      else if (/^emitentes/.test(k)) put(label, 'int', new Set(recs.map(r => r.emp)).size, v);
+    }
+    const gi = re => { const e = Object.entries(s.resumo.info).find(([k]) => re.test(norm(k))); return e ? e[1] : null; };
+    const parts = [['NFS-e lidas', /^nfselidas/], ['XMLs com erro de leitura', /^xmlscomerro/], ['Duplicadas removidas', /^duplicadasremovidas/], ['cStat (qtd. de notas)', /^cstat/], ['Notas com aviso no Log', /^notascomaviso/]].map(([l, re]) => [l, gi(re)]).filter(p => p[1] !== null);
+    if (parts.length) Q('Leitura original (aba Resumo)', parts[0][0] === 'NFS-e lidas' ? `${parts[0][1]} NFS-e lidas` : 'Informações do arquivo', 'info', parts.slice(parts[0][0] === 'NFS-e lidas' ? 1 : 0).map(p => `${p[0]}: ${p[1]}`).join('; ') + '.');
+  }
+  return V;
+}
+
+/* Conferência interna: as somas por grupo precisam fechar com o total do filtro atual. */
+function integrityChecks(list) {
+  const t = summarize(list), out = [];
+  const chk = (label, g) => { const vc = g.reduce((a, x) => a + x.vc, 0), ic = g.reduce((a, x) => a + x.ic, 0), n = g.reduce((a, x) => a + x.n, 0); out.push({ label, ok: vc === t.vc && ic === t.ic && n === t.n && TK.every(k => g.reduce((a, x) => a + (x[k] || 0), 0) === t[k]), vc, ic, n }); };
+  chk('Soma por empresa', groupBy(list, n => n.emp)); chk('Soma por retenção ISSQN', groupBy(list, n => n.ret));
+  chk('Soma por situação', groupBy(list, n => n.sit));
+  chk('Soma por tomador', groupBy(list, n => n.tomKey));
+  const dated = list.filter(n => n.date);
+  const tD = summarize(dated);
+  const d1 = seriesByPeriod(dated, 'dia').rows, d2 = seriesByPeriod(dated, 'mes').rows;
+  const s1 = d1.reduce((a, x) => a + x.vc, 0), s2 = d2.reduce((a, x) => a + x.vc, 0);
+  out.push({ label: 'Soma por dia (notas com data)', ok: s1 === tD.vc, vc: s1, ic: d1.reduce((a, x) => a + x.ic, 0), n: d1.reduce((a, x) => a + x.n, 0) });
+  out.push({ label: 'Soma por competência (notas com data)', ok: s2 === tD.vc, vc: s2, ic: d2.reduce((a, x) => a + x.ic, 0), n: d2.reduce((a, x) => a + x.n, 0) });
+  return { total: t, checks: out };
+}
+/* CORE-END */
+
+/* =====================================================================
+   INTERFACE
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const NUM = new Intl.NumberFormat('pt-BR');
+const money = c => BRL.format(c / 100);
+const pct = (x, d = 1) => isFinite(x) ? (x * 100).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%' : '—';
+const signed = (x, f) => (x > 0 ? '+' : x < 0 ? '−' : '') + f(Math.abs(x));
+const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+const slug = s => fold(s).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+function compact(c) {
+  const v = Math.abs(c) / 100, s = c < 0 ? '−' : '', f = (x, d) => x.toLocaleString('pt-BR', { maximumFractionDigits: d });
+  if (v >= 1e9) return s + 'R$ ' + f(v / 1e9, 1) + ' bi';
+  if (v >= 1e6) return s + 'R$ ' + f(v / 1e6, 1) + ' mi';
+  if (v >= 1e3) return s + 'R$ ' + f(v / 1e3, 0) + ' mil';
+  return s + 'R$ ' + f(v, 0);
+}
+const ICON = {
+  upload: '<path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/>',
+  download: '<path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  filter: '<path d="M3 5h18l-7 8v6l-4-2v-4L3 5z"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
+  alert: '<path d="M12 9v4m0 4h.01M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>',
+  sheet: '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  printer: '<path d="M7 9V3h10v6M7 17H5a2 2 0 01-2-2v-4a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2h-2M7 14h10v7H7z"/>',
+  chart: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
+  table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/>',
+  chevDown: '<path d="M6 9l6 6 6-6"/>',
+  group: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1a5 5 0 015-5h2a5 5 0 015 5v1M16 5.2a3 3 0 010 5.6M18 14.3a5 5 0 013 4.7v1"/>',
+};
+const ico = (n, cls) => `<svg class="${cls || 'h-4 w-4'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]}</svg>`;
+const stIcon = s => `<span class="st ${s}">${ico(s === 'ok' ? 'check' : s === 'info' ? 'info' : 'alert')}</span>`;
+
+const S = {
+  sources: [], errors: [], notes: [], byKey: new Map(), tom: new Map(), tomList: [], avail: null, cross: null, meta: {}, V: null,
+  F: null, filtered: [], sum: null, view: 'overview', tax: 'ic', gran: null, dim: 'cat', rankTab: 'tom', rankBy: 'vc', cmp: null,
+  tbl: { page: 1, size: 25, sort: 'date', dir: 'desc' }, printing: false, wasDark: false, advOpen: null, emp: null, companies: [], fatMode: null, rankBase: [], allNotes: [], byKeyAll: new Map(), G: null,
+};
+const charts = {};
+let toastTimer = null, qTimer = null;
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), 3200); }
+function loading(on, msg) { $('#loading').classList.toggle('hidden', !on); if (msg) $('#loading-txt').textContent = msg; }
+function copyText(t) {
+  const done = () => toast('Chave copiada');
+  if (navigator.clipboard && window.isSecureContext !== false) navigator.clipboard.writeText(t).then(done, () => fallbackCopy(t, done)); else fallbackCopy(t, done);
+}
+function fallbackCopy(t, cb) { const a = document.createElement('textarea'); a.value = t; a.style.position = 'fixed'; a.style.opacity = '0'; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); cb(); } catch (e) { toast('Não foi possível copiar'); } a.remove(); }
+
+/* ---------- Carga de arquivos ---------- */
+async function readFileToSource(file) {
+  const name = file.name, ext = name.split('.').pop().toLowerCase();
+  let wb;
+  if (['csv', 'tsv', 'txt'].includes(ext)) {
+    let text = await file.text();
+    if (text.includes('\ufffd')) text = new TextDecoder('windows-1252').decode(await file.arrayBuffer());
+    text = text.replace(/^\uFEFF/, '');
+    const head = text.split(/\r?\n/).filter(l => l.trim()).slice(0, 30).join('\n');
+    const count = c => head.split(c).length - 1;
+    const FS = [';', ',', '\t', '|'].map(c => [c, count(c)]).sort((a, b) => b[1] - a[1])[0][0];
+    wb = XLSX.read(text, { type: 'string', raw: true, FS });   /* raw: mantém a chave de 50 dígitos como texto */
+  } else {
+    wb = XLSX.read(await file.arrayBuffer(), { type: 'array', raw: true });
+  }
+  return parseWorkbook(wb, name);
+}
+async function ingest(fileList) {
+  const files = [...fileList]; if (!files.length) return;
+  if (typeof XLSX === 'undefined') { toast('A biblioteca SheetJS não foi carregada. Verifique a conexão com a internet.'); return; }
+  loading(true, files.length > 1 ? `Lendo ${files.length} arquivos…` : 'Lendo arquivo…');
+  await new Promise(r => setTimeout(r, 40));
+  for (const f of files) {
+    try {
+      const src = await readFileToSource(f);
+      S.errors = S.errors.filter(e => e.name !== f.name);
+      if (src.error) S.errors.push(src);
+      else { S.sources = S.sources.filter(s => s.name !== src.name); S.sources.push(src); }
+    } catch (e) { S.errors.push({ error: true, name: f.name, message: String((e && e.message) || e), tried: [] }); }
+  }
+  loading(false);
+  refreshData();
+}
+function cmpDefaults() {
+  const ms = S.avail.months;
+  if (ms.length >= 2) { const a = ms[ms.length - 2], b = ms[ms.length - 1]; return { aFrom: a + '-01', aTo: monthEnd(a), bFrom: b + '-01', bTo: monthEnd(b) }; }
+  if (ms.length === 1) { const m = ms[0]; return { aFrom: m + '-01', aTo: m + '-15', bFrom: m + '-16', bTo: monthEnd(m) }; }
+  return { aFrom: '', aTo: '', bFrom: '', bTo: '' };
+}
+function refreshData() {
+  const empty = !S.sources.length;
+  $('#empty').classList.toggle('hidden', !empty);
+  $('#workspace').classList.toggle('hidden', empty);
+  $('#tabs').classList.toggle('hidden', empty);
+  $('#export-wrap').classList.toggle('hidden', empty);
+  renderEmptyErrors();
+  if (empty) { S.notes = []; $('#hdr-sub').textContent = 'Carregue uma planilha para começar'; return; }
+  S.companies = companiesOf(S.sources); S.G = null;
+  if (S.emp !== '__all__' && !S.companies.some(c => c.emp === S.emp)) S.emp = S.companies.length > 1 ? '__all__' : S.companies[0].emp;   /* várias empresas: abre no consolidado */
+  applyScope();
+}
+/* Recalcula tudo para a empresa selecionada (ou o consolidado). Cada empresa é lida e validada isoladamente. */
+function applyScope() {
+  const all = S.emp === '__all__', multi = S.companies.length > 1;
+  const R = rebuild(S.sources, all ? null : S.emp);
+  /* A validação considera sempre o arquivo inteiro: a aba Resumo traz os totais de todas as empresas. */
+  const RA = all ? R : rebuild(S.sources, null);
+  const nm = new Map(S.companies.map(c => [c.emp, c.name]));
+  for (const n of R.notes.concat(all ? [] : RA.notes)) n.empName = nm.get(n.emp) || n.empName;
+  S.notes = R.notes; S.byKey = R.byKey; S.tom = R.tom; S.avail = R.avail; S.cross = R.cross;
+  S.allNotes = RA.notes; S.byKeyAll = RA.byKey; if (!S.G) S.G = gDefaults();   /* aba Grupo: sempre todas as empresas */
+  const metaAll = Object.assign({}, ...S.sources.map(s => s.meta)), co = S.companies.find(c => c.emp === S.emp);
+  S.meta = (all && multi) ? Object.assign({}, metaAll, { empresa: 'Todas as empresas (consolidado)', cnpj: '' }) : Object.assign({}, metaAll, co ? { empresa: co.name, cnpj: co.cnpj } : {});
+  S.tomList = [...R.tom.values()].sort((a, b) => b.vc - a.vc);
+  S.V = buildValidation(S.sources, RA.notes, RA.cross, metaAll, RA.tom);
+  S.F = defaultFilters(R.avail); S.cmp = cmpDefaults(); S.tax = 'ic'; S.tbl.page = 1; S.gran = null; S.fatMode = null;
+  S.dim = (all && multi) ? 'emp' : (S.dim === 'emp' ? 'cat' : S.dim);   /* consolidado: abre o gráfico por empresa */
+  renderEmpBar();
+  renderFilters();
+  renderAll();
+}
+const isConsolidated = () => S.emp === '__all__' && S.companies.length > 1;
+const hasCat = () => S.avail.cat.some(x => x.v !== 'Não informado');
+function renderEmpBar() {
+  const b = $('#emp-bar');
+  if (S.companies.length < 2) { b.innerHTML = ''; b.classList.add('hidden'); return; }
+  b.classList.remove('hidden');
+  b.innerHTML = `<div class="card flex flex-wrap items-center gap-x-3 gap-y-2 p-3 sm:px-4"><label for="emp-sel" class="text-sm font-medium">Empresa</label>
+    <select id="emp-sel" class="inp !w-auto min-w-[240px] max-w-full">${S.companies.map(c => `<option value="${esc(c.emp)}">${esc(c.name)} (${esc(c.cnpj)})</option>`).join('')}<option value="__all__">Todas as empresas (consolidado)</option></select>
+    <span class="muted text-sm">${S.companies.length} empresas (emitentes) nos arquivos. A aba Validação considera todas.</span></div>`;
+  $('#emp-sel').value = S.emp;
+}
+
+/* ---------- Filtros ---------- */
+function applyFilter() { S.filtered = S.notes.filter(n => passes(n, S.F)); S.rankBase = S.notes.filter(n => passes(n, S.F, { noTom: true })); S.sum = summarize(S.filtered); }
+function onFilterChange() { S.tbl.page = 1; applyFilter(); renderAlerts(); syncFilters(); renderActiveView(); }
+function activeCount() {
+  const F = S.F, D = defaultFilters(S.avail), same = (a, b) => a.size === b.size && [...a].every(x => b.has(x));
+  return [F.q, F.month, F.from, F.to, F.min !== null, F.max !== null, F.tom.size, !same(F.sit, D.sit), !same(F.ret, D.ret), !same(F.contr, D.contr), !same(F.cat, D.cat)].filter(Boolean).length;
+}
+function describeFilters() {
+  const F = S.F, a = S.avail, o = [];
+  o.push('Situação: ' + (F.sit.size ? (a.sit.every(x => F.sit.has(x.v)) ? 'todas' : [...F.sit].join(', ')) : 'nenhuma'));
+  if (!a.ret.every(x => F.ret.has(x.v))) o.push('Retenção ISSQN: ' + ([...F.ret].join(', ') || 'nenhuma'));
+  if (!a.contr.every(x => F.contr.has(x.v))) o.push('Tipo de contratação (Plano de Saúde): ' + ([...F.contr].join(', ') || 'nenhum'));
+  if (!a.cat.every(x => F.cat.has(x.v))) o.push('Tipo de serviço: ' + ([...F.cat].join(', ') || 'nenhum'));
+  if (F.month) o.push('Competência: ' + fmtComp(F.month));
+  if (F.from || F.to) o.push('Datas: ' + (F.from ? fmtDate(F.from) : 'início') + ' a ' + (F.to ? fmtDate(F.to) : 'fim'));
+  if (F.tom.size) o.push('Tomadores: ' + [...F.tom].map(k => S.tom.get(k) ? S.tom.get(k).label : k).join('; '));
+  if (F.min !== null || F.max !== null) o.push('Valor da nota: ' + (F.min !== null ? 'de ' + BRL.format(F.min) : '') + (F.max !== null ? ' até ' + BRL.format(F.max) : ''));
+  if (F.q) o.push('Busca: “' + F.q + '”');
+  return o;
+}
+const chipHtml = (f, x) => `<button type="button" class="chip" aria-pressed="true" data-action="chip" data-f="${f}" data-v="${esc(x.v)}" title="${esc(x.v)}">${esc(trunc(x.v, 44))} <span class="n">${NUM.format(x.n)}</span></button>`;
+function renderFilters() {
+  const a = S.avail;
+  $('#filters').innerHTML = `
+  <div class="flex flex-wrap items-end gap-3 p-3 sm:p-4">
+    <div class="w-full sm:w-44"><label class="lbl" for="f-month">Competência</label>
+      <select id="f-month" class="inp"><option value="">Todas</option>${a.months.map(m => `<option value="${m}">${fmtComp(m)}</option>`).join('')}</select></div>
+    <div class="relative min-w-[240px] flex-1 sm:max-w-md"><label class="lbl" for="f-tom">Tomador</label>
+      <input id="f-tom" class="inp" type="search" autocomplete="off" placeholder="Digite o nome ou o CPF/CNPJ do tomador" aria-label="Buscar tomador">
+      <div id="tom-list" class="menu hidden" style="left:0;right:0;max-height:300px;overflow:auto"></div></div>
+    <div class="min-w-[200px] flex-1 md:max-w-xs"><label class="lbl" for="f-q">Busca rápida</label>
+      <input id="f-q" class="inp" type="search" placeholder="Nº da nota, CPF/CNPJ ou chave" autocomplete="off" aria-label="Busca rápida"></div>
+    <button class="btn" data-action="toggle-adv" aria-expanded="false">${ico('filter')}<span>Filtros avançados</span><span id="f-count" class="badge b-brand hidden"></span></button>
+    <button class="btn btn-ghost" data-action="clear-filters">${ico('x')}<span>Limpar</span></button>
+    <p id="f-result" class="muted ml-auto text-sm"></p>
+  </div>
+  <div id="tom-chips" class="flex flex-wrap gap-2 px-3 pb-3 sm:px-4 empty:hidden"></div>
+  <div id="f-adv" class="grid gap-x-5 gap-y-4 border-t p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-4" style="border-color:var(--line)">
+    <div><label class="lbl" for="f-from">Data inicial</label><input id="f-from" type="date" class="inp" min="${a.minDate}" max="${a.maxDate}"></div>
+    <div><label class="lbl" for="f-to">Data final</label><input id="f-to" type="date" class="inp" min="${a.minDate}" max="${a.maxDate}"></div>
+    <div class="grid grid-cols-2 gap-2">
+      <div><label class="lbl" for="f-min">Valor mínimo (R$)</label><input id="f-min" type="number" min="0" step="0.01" inputmode="decimal" class="inp" placeholder="0,00"></div>
+      <div><label class="lbl" for="f-max">Valor máximo (R$)</label><input id="f-max" type="number" min="0" step="0.01" inputmode="decimal" class="inp" placeholder="sem limite"></div>
+    </div>
+    <div class="sm:col-span-2"><span class="lbl">Situação</span><div class="flex flex-wrap gap-2">${a.sit.map(x => chipHtml('sit', x)).join('')}</div></div>
+    <div class="sm:col-span-2"><span class="lbl">Retenção ISSQN</span><div class="flex flex-wrap gap-2">${a.ret.map(x => chipHtml('ret', x)).join('')}</div></div>
+    <div class="sm:col-span-2"><span class="lbl">Tipo de contratação <span class="muted font-normal">(só Planos de Saúde)</span></span><div class="flex flex-wrap gap-2">${a.contr.map(x => chipHtml('contr', x)).join('')}</div></div>
+    ${hasCat() ? `<div class="sm:col-span-2"><span class="lbl">Tipo de serviço</span><div class="flex flex-wrap gap-2">${a.cat.map(x => chipHtml('cat', x)).join('')}</div></div>` : ''}
+  </div>`;
+  applyAdv(); syncFilters();
+}
+function advWanted() { return S.advOpen === true; }
+function applyAdv() { const p = $('#f-adv'), b = document.querySelector('[data-action="toggle-adv"]'); if (!p) return; const o = advWanted(); p.classList.toggle('hidden', !o); if (b) b.setAttribute('aria-expanded', String(o)); }
+function syncFilters() {
+  if (!$('#f-adv')) return;
+  const F = S.F;
+  document.querySelectorAll('#filters [data-action="chip"]').forEach(b => b.setAttribute('aria-pressed', String(F[b.dataset.f].has(b.dataset.v))));
+  $('#f-month').value = F.month; $('#f-from').value = F.from; $('#f-to').value = F.to;
+  $('#f-min').value = F.min === null ? '' : F.min; $('#f-max').value = F.max === null ? '' : F.max;
+  const c = activeCount(), fc = $('#f-count'); fc.textContent = c; fc.classList.toggle('hidden', !c);
+  $('#f-result').textContent = `${NUM.format(S.filtered.length)} de ${NUM.format(S.notes.length)} NFS-e`;
+  $('#tom-chips').innerHTML = [...F.tom].map(k => { const t = S.tom.get(k); return `<span class="chip" aria-pressed="true">${esc(t ? trunc(t.label, 48) : k)}<button type="button" data-action="tom-del" data-v="${esc(k)}" aria-label="Remover tomador" style="display:inline-flex">${ico('x', 'h-3 w-3')}</button></span>`; }).join('');
+}
+function showTomList() {
+  const q = $('#f-tom').value, w = fold(q).split(/\s+/).filter(Boolean), dq = q.replace(/\D/g, '');
+  let arr = S.tomList.filter(t => !S.F.tom.has(t.key));
+  if (w.length) arr = arr.filter(t => w.every(x => t.hay.includes(x)) || (dq.length >= 3 && t.hay.includes(dq)));
+  const box = $('#tom-list'); const total = arr.length; arr = arr.slice(0, 40);
+  box.innerHTML = arr.length ? arr.map(t => `<div class="opt" role="option" data-action="tom-add" data-v="${esc(t.key)}"><span class="min-w-0 flex-1"><b class="block truncate font-medium">${esc(t.name)}</b><span class="muted text-xs">${esc(t.doc || 'sem documento')}</span></span><span class="muted text-xs">${money(t.vc)}</span></div>`).join('') + (total > 40 ? `<div class="muted px-2 py-1.5 text-xs">Mostrando 40 de ${NUM.format(total)}. Continue digitando para refinar.</div>` : '')
+    : '<div class="muted px-2 py-2 text-sm">Nenhum tomador encontrado.</div>';
+  box.classList.remove('hidden');
+}
+const hideTomList = () => { const b = $('#tom-list'); if (b) b.classList.add('hidden'); };
+
+/* ---------- Cabeçalho, abas, avisos ---------- */
+function renderHeader() {
+  const c = S.companies.find(x => x.emp === S.emp);
+  let txt = 'NFS-e';
+  if (isConsolidated()) txt = 'Todas as empresas (consolidado)';
+  else if (c) txt = (c.name && c.name !== c.cnpj) ? `${c.name}, CNPJ ${c.cnpj}` : `CNPJ ${c.cnpj}`;
+  if (S.view === 'grupo') txt = 'Empresas do Grupo (todos os emitentes dos arquivos)';
+  $('#hdr-sub').textContent = txt; $('#hdr-sub').title = txt;
+  const bad = S.V.quality.some(q => q.alert) || S.V.recon.some(r => r.status === 'err');
+  const tabs = [['overview', 'chart', 'Visão geral'], ['table', 'table', `NFS-e (${NUM.format(S.filtered.length)})`], ['grupo', 'group', 'Grupo'], ['validation', 'shield', 'Validação']];
+  $('#tabs').innerHTML = tabs.map(t => `<button role="tab" class="tab" data-action="tab" data-v="${t[0]}" aria-selected="${S.view === t[0]}">${ico(t[1])}${t[2]}${t[0] === 'validation' && bad ? '<span class="dot" style="background:var(--amber);border-radius:50%;width:8px;height:8px"></span>' : ''}</button>`).join('');
+}
+function showView() {
+  ['overview', 'table', 'validation', 'grupo'].forEach(v => $('#view-' + v).classList.toggle('hidden', v !== S.view));
+  $('#filters').classList.toggle('hidden', S.view === 'validation' || S.view === 'grupo');
+  $('#emp-bar').toggleAttribute('hidden', S.view === 'grupo');   /* a aba Grupo usa todas as empresas */
+  $('#alerts').toggleAttribute('hidden', S.view === 'grupo');
+  renderHeader();
+}
+function errorHtml(e, i) {
+  const found = (e.tried || []).map(t => `aba “${esc(t.sheet)}” (${NUM.format(t.rows)} linhas)${t.sample.length ? ': ' + esc(t.sample.join(' | ')) : ''}`).join('; ');
+  return `<div class="alert al-err"><span class="ai">${ico('alert')}</span><div class="min-w-0 flex-1"><b class="font-medium">Não foi possível ler “${esc(e.name)}”.</b> ${e.message ? esc(e.message) : 'Não encontrei a linha de cabeçalho. A planilha precisa ter as colunas <b>Vlr. Serviço</b> e <b>Chave da Nota</b> ou <b>Nº NFS-e</b>.'}${found ? `<div class="muted mt-1 text-xs">Conteúdo encontrado: ${found}</div>` : ''}</div><button class="btn btn-ghost btn-sm" data-action="dismiss-err" data-i="${i}" aria-label="Dispensar aviso">${ico('x')}</button></div>`;
+}
+function renderEmptyErrors() { $('#empty-errors').innerHTML = S.errors.map(errorHtml).join(''); }
+function renderAlerts() {
+  const out = S.errors.map(errorHtml);
+  for (const q of S.V.quality) if (q.alert) out.push(`<div class="alert ${q.status === 'err' ? 'al-err' : 'al-warn'}"><span class="ai">${ico('alert')}</span><div><b class="font-medium">${esc(q.label)}: ${esc(q.value)}.</b> ${esc(q.detail)}</div></div>`);
+  for (const r of S.V.recon) if (r.status === 'err') out.push(`<div class="alert al-err"><span class="ai">${ico('alert')}</span><div><b class="font-medium">${esc(r.metric)} não confere com o rodapé de “${esc(r.file)}”.</b> ${esc(r.text)}</div></div>`);
+  for (const r of S.V.resumo || []) if (r.status === 'err') out.push(`<div class="alert al-err"><span class="ai">${ico('alert')}</span><div><b class="font-medium">${esc(r.label)} não confere com a aba Resumo de “${esc(r.file)}”.</b> Dashboard: ${esc(r.dash)}. Resumo: ${esc(r.res)}.</div></div>`);
+  if (S.F.tom.size) out.push(`<div class="alert al-info"><span class="ai">${ico('info')}</span><div class="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1"><span>Comparando <b class="font-medium">${NUM.format(S.F.tom.size)}</b> ${S.F.tom.size === 1 ? 'tomador selecionado' : 'tomadores selecionados'}: indicadores, gráficos por período e tabela mostram só ${S.F.tom.size === 1 ? 'ele' : 'eles'}. O ranking e o gráfico de tomadores continuam listando todos, com os selecionados em destaque.</span><button class="btn btn-sm" data-action="tom-clear">Limpar seleção</button></div></div>`);
+  const ex = S.notes.filter(n => passes(n, S.F, { noSit: true }) && !S.F.sit.has(n.sit));
+  if (ex.length) {
+    const g = groupBy(ex, n => n.sit);
+    out.push(`<div class="alert al-info"><span class="ai">${ico('info')}</span><div class="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1"><span>O filtro de Situação deixa fora dos indicadores: ${g.map(x => `<b class="font-medium">${esc(x.key)}</b> (${NUM.format(x.n)} NFS-e, ${money(x.vc)})`).join('; ')}.</span>${g.map(x => `<button class="btn btn-sm" data-action="chip" data-f="sit" data-v="${esc(x.key)}">Incluir ${esc(x.key.toLowerCase())}</button>`).join('')}</div></div>`);
+  }
+  $('#alerts').innerHTML = out.join('');
+}
+function renderAll() { applyFilter(); renderHeader(); renderAlerts(); syncFilters(); showView(); renderActiveView(); }
+function renderActiveView() {
+  renderHeader();
+  if (S.view === 'overview') renderOverview(); else if (S.view === 'table') renderTable(); else if (S.view === 'grupo') renderGrupo(); else renderValidation();
+}
+
+/* ---------- Visão geral ---------- */
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const PAL_L = ['#0d6b73', '#3a5a94', '#cf9420', '#b4503a', '#6d9a68', '#7a5c8e', '#8a949b'];
+const PAL_D = ['#4db6bf', '#86a9e0', '#e4b650', '#e48b74', '#8fc18a', '#b99bcb', '#9aa7ae'];
+const pal = () => document.documentElement.classList.contains('dark') ? PAL_D : PAL_L;
+const alpha = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+function theme() { return { ink: cssv('--ink-2'), muted: cssv('--muted'), grid: cssv('--grid'), brand: cssv('--brand'), surface: cssv('--surface') }; }
+function drawChart(id, cfg) {
+  const el = document.getElementById(id); if (!el) return;
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  if (typeof Chart === 'undefined') { if (!drawChart.warned) { drawChart.warned = true; toast('Não foi possível carregar o Chart.js. Verifique a conexão com a internet.'); } return; }
+  Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif"; Chart.defaults.font.size = 12;
+  charts[id] = new Chart(el, cfg);
+}
+function curGran() {
+  if (S.gran) return S.gran;
+  if (S.avail.anyMonthOnly) return 'mes';
+  return new Set(S.filtered.map(n => n.ym).filter(Boolean)).size > 1 ? 'mes' : 'dia';
+}
+const GRAN = { dia: ['dia', 'dias'], semana: ['semana', 'semanas'], mes: ['competência', 'competências'] };
+
+function renderKPIs() {
+  const t = S.sum, g = groupBy(S.filtered, n => n.tomKey).sort((a, b) => b.vc - a.vc);
+  const top10 = g.slice(0, 10).reduce((a, x) => a + x.vc, 0);
+  const baseLine = t.nb ? `<div class="kpi-s">Base de cálculo ${money(t.bc)}, alíquota efetiva ${pct(t.bc ? t.ic / t.bc : 0, 2)}${t.nb < t.n ? ` (base informada em ${NUM.format(t.nb)} de ${NUM.format(t.n)} notas)` : ''}</div>` : '';
+  $('#kpis').innerHTML = `
+    <div class="kpi big"><div class="kpi-l">Faturamento</div><div class="kpi-v">${money(t.vc)}</div><div class="kpi-s">Soma do Vlr. Serviço. Ticket médio ${t.n ? money(t.vc / t.n) : '—'}</div></div>
+    <div class="kpi"><div class="kpi-l">ISSQN</div><div class="kpi-v">${money(t.ic)}</div><div class="kpi-s">${t.vc ? pct(t.ic / t.vc, 2) + ' do faturamento' : '—'}</div>${baseLine}</div>
+    <div class="kpi"><div class="kpi-l">NFS-e</div><div class="kpi-v">${NUM.format(t.n)}</div><div class="kpi-s">Maior nota: ${money(t.max)}</div></div>
+    <div class="kpi"><div class="kpi-l">Tomadores</div><div class="kpi-v">${NUM.format(t.tom)}</div><div class="kpi-s">${t.vc ? `Os 10 maiores concentram ${pct(top10 / t.vc)} do faturamento` : '—'}</div></div>`;
+}
+
+function renderEvolution() {
+  const g = curGran(), { rows, skipped } = seriesByPeriod(S.filtered, g), th = theme(), P = pal();
+  const multiY = new Set(rows.map(r => r.key.slice(0, 4))).size > 1;
+  const label = r => g === 'mes' ? fmtComp(r.key) : g === 'semana' ? r.key.slice(8, 10) + '/' + r.key.slice(5, 7) + (multiY ? '/' + r.key.slice(2, 4) : '') : r.key.slice(8, 10) + '/' + r.key.slice(5, 7) + (multiY ? '/' + r.key.slice(2, 4) : '');
+  const title = r => g === 'mes' ? 'Competência ' + fmtComp(r.key) : g === 'semana' ? `Semana de ${fmtDate(r.key)} a ${fmtDate(addDays(r.key, 6))}` : `${fmtDate(r.key)} (${WD[new Date(r.key + 'T00:00:00Z').getUTCDay()]})`;
+  const nm = GRAN[g][0];
+  $('#t-fat').textContent = 'Faturamento por ' + nm; $('#t-iss').textContent = TAXD[S.tax].label + ' por ' + nm;
+  const ms = [...new Set(S.filtered.map(n => n.ym).filter(Boolean))].sort();
+  $('#evo-sub').textContent = (ms.length ? (ms.length === 1 ? 'Competência ' + fmtComp(ms[0]) : `Competências ${fmtComp(ms[0])} a ${fmtComp(ms[ms.length - 1])}`) : 'Sem datas no filtro atual') + `, ${NUM.format(rows.length)} ${GRAN[g][rows.length === 1 ? 0 : 1]}` + (skipped ? `, ${NUM.format(skipped)} NFS-e sem data ficam fora destes gráficos` : '');
+  document.querySelectorAll('#seg-gran button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === g)));
+  document.querySelectorAll('#seg-tax button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === S.tax)); b.hidden = !S.avail.tax[b.dataset.v]; });
+  const prevInfo = (arr, i, key) => { if (i === 0 || !arr[i - 1][key]) return null; const d = (arr[i][key] - arr[i - 1][key]) / arr[i - 1][key]; return 'Variação sobre o anterior: ' + signed(d, x => pct(x)); };
+  const common = { responsive: true, maintainAspectRatio: false, animation: { duration: S.printing ? 0 : 250 }, interaction: { mode: 'index', intersect: false } };
+  const scales = { x: { grid: { display: false }, ticks: { color: th.muted, maxRotation: 0, autoSkip: true, maxTicksLimit: g === 'dia' ? 16 : 12 } }, y: { beginAtZero: true, border: { display: false }, grid: { color: th.grid }, ticks: { color: th.muted, callback: v => compact(v * 100) } } };
+  /* Faturamento: total ou empilhado por categoria de serviço (Plano de Saúde x Serviço Hospitalar) */
+  const CATS = ['Plano de Saúde', 'Serviço Hospitalar', 'Outros serviços', 'Não informado'], catCol = c => ({ 'Plano de Saúde': P[0], 'Serviço Hospitalar': P[2], 'Outros serviços': P[3], 'Não informado': P[6] }[c] || P[6]);
+  const canCat = hasCat(), useCat = canCat && (S.fatMode ? S.fatMode === 'cat' : true);
+  document.querySelectorAll('#seg-fat button').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.v === (useCat ? 'cat' : 'total'))); if (b.dataset.v === 'cat') b.disabled = !canCat; });
+  const gc = groupBy(S.filtered, n => n.cat).sort((a, b) => CATS.indexOf(a.key) - CATS.indexOf(b.key)), totC = gc.reduce((a, x) => a + x.vc, 0);
+  $('#fat-cats').innerHTML = !canCat ? '<p class="muted text-xs">Para separar Plano de Saúde de Serviço Hospitalar, carregue também a planilha Analítica (é nela que vem o Nome do Serviço).</p>'
+    : gc.map(x => `<div class="flex items-center gap-2"><span class="dot" style="background:${catCol(x.key)}"></span><span class="min-w-0 flex-1 truncate">${esc(x.key)}</span><span class="muted text-xs">${NUM.format(x.n)} NFS-e</span><span class="font-medium">${money(x.vc)}</span><span class="muted w-14 text-right">${pct(totC ? x.vc / totC : 0)}</span></div>`).join('');
+  const byCat = new Map();
+  if (useCat) for (const n of S.filtered) { const k = bucketOf(n, g); if (k === null) continue; let o = byCat.get(k); if (!o) { o = {}; byCat.set(k, o); } o[n.cat] = (o[n.cat] || 0) + n.vc; }
+  const catsUsed = useCat ? CATS.filter(c => gc.some(x => x.key === c)) : [];
+  const fatSets = useCat ? catsUsed.map(c => ({ label: c, data: rows.map(r => ((byCat.get(r.key) || {})[c] || 0) / 100), backgroundColor: catCol(c), stack: 's', maxBarThickness: 30 }))
+    : [{ label: 'Faturamento', data: rows.map(r => r.vc / 100), backgroundColor: th.brand, borderRadius: 3, maxBarThickness: 30 }];
+  drawChart('c-fat', { type: 'bar', data: { labels: rows.map(label), datasets: fatSets },
+    options: { ...common, scales: { x: { ...scales.x, stacked: useCat }, y: { ...scales.y, stacked: useCat } },
+      plugins: { legend: { display: useCat, position: 'bottom', labels: { color: th.ink, boxWidth: 10, boxHeight: 10 } },
+        tooltip: { callbacks: { title: i => title(rows[i[0].dataIndex]), label: c => `${c.dataset.label}: ${BRL.format(c.parsed.y)}`,
+          footer: items => { const r = rows[items[0].dataIndex]; return useCat ? [`Total: ${money(r.vc)}`, `NFS-e: ${NUM.format(r.n)}`, prevInfo(rows, items[0].dataIndex, 'vc')].filter(Boolean) : [`NFS-e: ${NUM.format(r.n)}`, prevInfo(rows, items[0].dataIndex, 'vc')].filter(Boolean); } } } } } });
+  drawChart('c-iss', { type: 'line', data: { labels: rows.map(label), datasets: [{ label: TAXD[S.tax].short, data: rows.map(r => r[S.tax] / 100), borderColor: P[2], backgroundColor: alpha(P[2], 0.16), fill: true, tension: 0.25, borderWidth: 2, pointRadius: rows.length > 45 ? 0 : 3, pointBackgroundColor: P[2] }] },
+    options: { ...common, scales, plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => title(rows[i[0].dataIndex]), label: c => TAXD[S.tax].short + ': ' + BRL.format(c.parsed.y), afterLabel: c => [`NFS-e: ${NUM.format(rows[c.dataIndex].n)}`, prevInfo(rows, c.dataIndex, S.tax)].filter(Boolean) } } } } });
+}
+
+const DIMS = { emp: ['empresa', n => n.empName], cat: ['tipo de serviço', n => n.cat], ret: ['retenção ISSQN', n => n.ret], sit: ['situação', n => n.sit] };
+function renderDimCard() {
+  if (S.dim === 'emp' && !isConsolidated()) S.dim = 'cat';
+  const be = document.querySelector('#seg-dim [data-v="emp"]'); if (be) be.hidden = !isConsolidated();
+  const d = DIMS[S.dim], g = groupBy(S.filtered, d[1]).sort((a, b) => b.vc - a.vc), total = g.reduce((a, x) => a + x.vc, 0), th = theme(), P = pal();
+  $('#dim-name').textContent = d[0];
+  document.querySelectorAll('#seg-dim button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.dim)));
+  drawChart('c-dim', { type: 'doughnut', data: { labels: g.map(x => x.key), datasets: [{ data: g.map(x => x.vc / 100), backgroundColor: g.map((_, i) => P[i % P.length]), borderColor: th.surface, borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', animation: { duration: S.printing ? 0 : 250 }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.label}: ${BRL.format(c.parsed)} (${pct(total ? c.parsed * 100 / total : 0)})`, afterLabel: c => `NFS-e: ${NUM.format(g[c.dataIndex].n)}` } } } } });
+  $('#dim-legend').innerHTML = g.length ? g.map((x, i) => `<div class="flex items-center gap-2"><span class="dot" style="background:${P[i % P.length]}"></span><span class="min-w-0 flex-1 truncate" title="${esc(x.key)}">${esc(x.key)}</span><span class="font-medium">${money(x.vc)}</span><span class="muted w-14 text-right">${pct(total ? x.vc / total : 0)}</span></div>`).join('') : '<p class="muted">Sem dados no filtro atual.</p>';
+}
+function renderContrCard() {
+  const th = theme(), P = pal(), col = c => ({ 'Individual/Familiar': P[2], 'Coletivo Empresarial': P[0], 'Coletivo por Adesão': P[1] }[c] || P[6]);
+  const ORDER = ['Individual/Familiar', 'Coletivo Empresarial', 'Coletivo por Adesão', 'Não identificado'];
+  const plano = S.filtered.filter(n => n.cat === 'Plano de Saúde');   /* só Plano de Saúde entra nesta conta */
+  const g = groupBy(plano, n => n.contr).sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key)), total = g.reduce((a, x) => a + x.vc, 0);
+  const tomBy = new Map(); for (const n of plano) { if (!tomBy.has(n.contr)) tomBy.set(n.contr, new Set()); tomBy.get(n.contr).add(n.tomKey); }
+  drawChart('c-contr', { type: 'doughnut', data: { labels: g.map(x => x.key), datasets: [{ data: g.map(x => x.vc / 100), backgroundColor: g.map(x => col(x.key)), borderColor: th.surface, borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', animation: { duration: S.printing ? 0 : 250 }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.label}: ${BRL.format(c.parsed)} (${pct(total ? c.parsed * 100 / total : 0)})`, afterLabel: c => [`NFS-e: ${NUM.format(g[c.dataIndex].n)}`, `Tomadores: ${NUM.format(tomBy.get(g[c.dataIndex].key).size)}`] } } } } });
+  $('#contr-legend').innerHTML = g.length ? g.map(x => `<div><div class="flex items-center gap-2"><span class="dot" style="background:${col(x.key)}"></span><span class="min-w-0 flex-1 truncate font-medium" title="${esc(x.key)}">${esc(x.key)}</span><span class="font-medium">${money(x.vc)}</span><span class="muted w-14 text-right">${pct(total ? x.vc / total : 0)}</span></div><div class="muted pl-[18px] text-xs">${NUM.format(x.n)} NFS-e, ${NUM.format(tomBy.get(x.key).size)} tomadores, ticket médio ${money(x.vc / x.n)}</div></div>`).join('') + `<p class="muted text-xs">Base: ${NUM.format(plano.length)} NFS-e de Plano de Saúde (${money(total)}). Outros serviços ficam fora deste gráfico.</p>`
+    : `<p class="muted">${hasCat() ? 'Sem NFS-e de Plano de Saúde no filtro atual.' : 'Para identificar Plano de Saúde, carregue também a planilha Analítica (é nela que vem o Nome do Serviço).'}</p>`;
+}
+/* Ranking e gráfico de tomadores usam a base SEM o filtro de tomador: assim a lista completa continua visível e os selecionados ficam em destaque. */
+function tomGroups() { return groupBy(S.rankBase, n => n.tomKey).sort((a, b) => b[S.rankBy] - a[S.rankBy] || b.vc - a.vc); }
+function renderTomChart() {
+  const th = theme(), sel = S.F.tom, g0 = groupBy(S.rankBase, n => n.tomKey).sort((a, b) => b.vc - a.vc);
+  const g = g0.slice(0, 10); g0.slice(10).forEach(x => { if (sel.has(x.key)) g.push(x); });
+  const full = g.map(x => S.tom.get(x.key).label);
+  $('#tom-sub').textContent = sel.size ? `Os 10 maiores, mais os ${NUM.format(sel.size)} selecionados em destaque` : 'Os 10 maiores tomadores no filtro atual';
+  drawChart('c-tom', { type: 'bar', data: { labels: full.map(s => trunc(s, window.innerWidth < 640 ? 20 : 30)), datasets: [{ data: g.map(x => x.vc / 100), backgroundColor: g.map(x => !sel.size || sel.has(x.key) ? th.brand : alpha(th.brand, 0.3)), borderRadius: 3, maxBarThickness: 22 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: { duration: S.printing ? 0 : 250 },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { title: i => full[i[0].dataIndex], label: c => 'Faturamento: ' + BRL.format(c.parsed.x), afterLabel: c => [`ISSQN: ${money(g[c.dataIndex].ic)}`, `NFS-e: ${NUM.format(g[c.dataIndex].n)}`] } } },
+      scales: { x: { beginAtZero: true, border: { display: false }, grid: { color: th.grid }, ticks: { color: th.muted, callback: v => compact(v * 100) } }, y: { grid: { display: false }, ticks: { color: th.ink, autoSkip: false } } } } });
+}
+
+function renderCompare() {
+  const c = S.cmp, base = S.notes.filter(n => passes(n, S.F, { noDate: true }));
+  const inR = (a, b) => (a && b) ? base.filter(n => n.date && n.date >= a && n.date <= b) : [];
+  const A = summarize(inR(c.aFrom, c.aTo)), B = summarize(inR(c.bFrom, c.bTo));
+  const R = [['Faturamento', A.vc, B.vc, 'money'], ['ISSQN', A.ic, B.ic, 'money'], ...TAXES.slice(1).filter(x => S.avail.tax[x.k]).map(x => [x.label, A[x.k], B[x.k], 'money']), ['NFS-e', A.n, B.n, 'int'], ['Tomadores', A.tom, B.tom, 'int'],
+    ['Ticket médio', A.n ? A.vc / A.n : 0, B.n ? B.vc / B.n : 0, 'money'], ['ISSQN ÷ Faturamento', A.vc ? A.ic / A.vc : 0, B.vc ? B.ic / B.vc : 0, 'pct']];
+  const fmt = (v, t) => t === 'money' ? money(v) : t === 'int' ? NUM.format(v) : pct(v, 2);
+  const rows = R.map(([l, a, b, t]) => {
+    const d = b - a, cl = d > 0 ? 'pos' : d < 0 ? 'neg' : 'muted';
+    const dTxt = t === 'pct' ? signed(d * 100, x => x.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' p.p.') : signed(d, x => fmt(x, t));
+    const dPct = t === 'pct' ? '—' : a ? signed(d / Math.abs(a), x => pct(x)) : '—';
+    return `<tr><td>${l}</td><td class="r">${fmt(a, t)}</td><td class="r">${fmt(b, t)}</td><td class="r ${cl}">${d === 0 ? '0' : dTxt}${dPct !== '—' ? `<div class="text-[11px]">${dPct}</div>` : ''}</td></tr>`;
+  }).join('');
+  const lbl = (a, b) => (a && b) ? `${fmtDate(a)} a ${fmtDate(b)}` : 'defina as datas';
+  const dt = (id, v, name) => `<input id="${id}" type="date" class="inp" value="${v}" min="${S.avail.minDate}" max="${S.avail.maxDate}" aria-label="${name}">`;
+  $('#cmp').innerHTML = `
+    <div class="card-h"><div><h3 class="t-title">Comparativo de períodos</h3><p class="t-sub">Período B contra o período A. Respeita os filtros, exceto as datas.</p></div><button class="btn btn-sm no-print" data-action="cmp-reset">Restaurar padrão</button></div>
+    <div class="card-b">
+      <div class="no-print grid grid-cols-2 gap-x-3 gap-y-2">
+        <div><span class="lbl">Período A, de</span>${dt('cmp-af', c.aFrom, 'Período A, data inicial')}</div><div><span class="lbl">até</span>${dt('cmp-at', c.aTo, 'Período A, data final')}</div>
+        <div><span class="lbl">Período B, de</span>${dt('cmp-bf', c.bFrom, 'Período B, data inicial')}</div><div><span class="lbl">até</span>${dt('cmp-bt', c.bTo, 'Período B, data final')}</div>
+      </div>
+      <div class="scroll-x mt-3"><table class="tbl compact"><thead><tr><th>Indicador</th><th class="r">A<div class="muted text-[11px] font-normal">${lbl(c.aFrom, c.aTo)}</div></th><th class="r">B<div class="muted text-[11px] font-normal">${lbl(c.bFrom, c.bTo)}</div></th><th class="r">Variação de B<div class="muted text-[11px] font-normal">sobre A</div></th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>`;
+}
+
+function renderRank() {
+  const by = S.rankBy, sel = S.F.tom, seg = `<div class="seg no-print" role="group" aria-label="Tipo de ranking"><button data-action="rank-tab" data-v="tom" aria-pressed="${S.rankTab === 'tom'}">Tomadores</button><button data-action="rank-tab" data-v="nota" aria-pressed="${S.rankTab === 'nota'}">Maiores NFS-e</button></div>`;
+  let body = '', sub = '';
+  if (S.rankTab === 'tom') {
+    const g = tomGroups(), tot = g.reduce((a, x) => a + x[by], 0);
+    if (!g.length) body = '<p class="muted p-4 text-sm">Sem dados no filtro atual.</p>';
+    else {
+      const list = g.slice(0, 15).map((x, i) => ({ x, i })); g.slice(15).forEach((x, i) => { if (sel.has(x.key)) list.push({ x, i: i + 15 }); });
+      const hl = k => k === by ? ' style="font-weight:600"' : ''; let acc = 0;
+      const rows = list.map(({ x, i }) => { const on = sel.has(x.key); if (i < 15) acc += x[by];
+        return `<tr data-action="rank-filter" data-v="${esc(x.key)}" aria-selected="${on}" title="${on ? 'Clique para desmarcar' : 'Clique para marcar e comparar'}" style="${on ? 'background:var(--brand-soft)' : ''}"><td class="${on ? '' : 'muted'}" style="${on ? 'color:var(--brand)' : ''}">${on ? ico('check') : i + 1}</td><td class="wrap ${on ? 'font-medium' : ''}">${esc(S.tom.get(x.key).label)}${i >= 15 ? ` <span class="muted text-xs">(posição ${i + 1})</span>` : ''}</td><td class="r"${hl('vc')}>${money(x.vc)}</td><td class="r"${hl('ic')}>${money(x.ic)}</td><td class="r"${hl('n')}>${NUM.format(x.n)}</td><td class="r">${pct(tot ? x[by] / tot : 0)}</td><td class="r muted">${i < 15 ? pct(tot ? acc / tot : 0) : '—'}</td></tr>`; }).join('');
+      const ss = g.filter(x => sel.has(x.key)), sv = ss.reduce((a, x) => a + x.vc, 0), si = ss.reduce((a, x) => a + x.ic, 0), sn = ss.reduce((a, x) => a + x.n, 0), sb = ss.reduce((a, x) => a + x[by], 0);
+      const foot = sel.size ? `<tfoot><tr><td></td><td>Soma dos ${NUM.format(ss.length)} selecionados</td><td class="r">${money(sv)}</td><td class="r">${money(si)}</td><td class="r">${NUM.format(sn)}</td><td class="r">${pct(tot ? sb / tot : 0)}</td><td></td></tr></tfoot>` : '';
+      body = `<div class="scroll-x"><table class="tbl compact"><thead><tr><th></th><th>Tomador</th><th class="r">Faturamento</th><th class="r">ISSQN</th><th class="r">NFS-e</th><th class="r">% do total</th><th class="r">% acumulado</th></tr></thead><tbody>${rows}</tbody>${foot}</table></div>`;
+    }
+    sub = `Top 15 de ${NUM.format(g.length)} tomadores, ordenado por ${by === 'vc' ? 'faturamento' : by === 'ic' ? 'ISSQN' : 'quantidade de notas'}. Clique nas linhas para marcar vários tomadores e compará-los; clique de novo para desmarcar.`;
+  } else {
+    const l = [...S.filtered].sort((a, b) => b.vc - a.vc).slice(0, 15), tot = S.sum.vc;
+    body = l.length ? `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>#</th><th>Nº NFS-e</th><th>Tomador</th><th>Data</th><th class="r">Vlr. Serviço</th><th class="r">% do total</th></tr></thead><tbody>${l.map((n, i) => `<tr data-action="row" data-k="${esc(n.key)}"><td class="muted">${i + 1}</td><td>${esc(n.num)}</td><td class="wrap">${esc(n.tom)}</td><td>${fmtDate(n.date)}</td><td class="r">${money(n.vc)}</td><td class="r">${pct(tot ? n.vc / tot : 0)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted p-4 text-sm">Sem dados no filtro atual.</p>';
+    sub = 'As 15 maiores notas pelo Vlr. Serviço. Clique para ver os detalhes.';
+  }
+  $('#rank').innerHTML = `<div class="card-h"><div class="min-w-0 max-w-3xl"><h3 class="t-title">Ranking</h3><p class="t-sub">${sub}</p></div><div class="flex flex-wrap items-center gap-2">${sel.size && S.rankTab === 'tom' ? `<button class="btn btn-sm no-print" data-action="tom-clear">${ico('x', 'h-3.5 w-3.5')}Limpar seleção (${NUM.format(sel.size)})</button>` : ''}${S.rankTab === 'tom' ? `<select id="rank-by" class="inp no-print !w-auto" aria-label="Ordenar por"><option value="vc"${by === 'vc' ? ' selected' : ''}>Faturamento</option><option value="ic"${by === 'ic' ? ' selected' : ''}>ISSQN</option><option value="n"${by === 'n' ? ' selected' : ''}>Nº de NFS-e</option></select>` : ''}${seg}</div></div><div class="card-b !px-0 !pb-1">${body}</div>`;
+}
+function renderTaxKPIs() {
+  const t = S.sum, list = TAXES.slice(1).filter(x => S.avail.tax[x.k]), el = $('#kpis-tax');
+  el.classList.toggle('hidden', !list.length); el.style.setProperty('--kc', list.length || 1);
+  el.innerHTML = list.map(x => `<div class="kpi"><div class="kpi-l">${x.label}</div><div class="kpi-v">${money(t[x.k])}</div><div class="kpi-s">${t.cnt[x.k] ? `Informado em ${NUM.format(t.cnt[x.k])} de ${NUM.format(t.n)} NFS-e${t.vc ? `<br>${pct(t[x.k] / t.vc, 2)} do faturamento` : ''}` : 'Sem valor no filtro atual'}</div></div>`).join('');
+}
+function renderEmpCard() {
+  const el = $('#emp-card'); if (!el) return;
+  if (!isConsolidated()) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  const g = groupBy(S.filtered, n => n.emp).sort((a, b) => b.vc - a.vc), tot = S.sum.vc, co = new Map(S.companies.map(c => [c.emp, c]));
+  const tn = new Map(); for (const n of S.filtered) { let s = tn.get(n.emp); if (!s) tn.set(n.emp, s = new Set()); s.add(n.tomKey); }
+  const rows = g.map(x => { const c = co.get(x.key) || {}; return `<tr><td class="wrap"><div class="font-medium">${esc(c.name || x.key)}</div><div class="muted text-xs">${esc(fmtCnpj(x.key))}</div></td><td class="r">${NUM.format(x.n)}</td><td class="r">${money(x.vc)}</td><td class="r">${tot ? pct(x.vc / tot, 1) : '—'}</td><td class="r">${money(x.ic)}</td><td class="r">${NUM.format(tn.get(x.key).size)}</td></tr>`; }).join('');
+  el.classList.remove('hidden');
+  el.innerHTML = `<div class="card-h"><div><h3 class="t-title">Faturamento por empresa</h3><p class="t-sub">Emitentes das NFS-e no filtro atual, identificados pelo CNPJ/CPF do emitente.</p></div></div><div class="card-b !px-0"><div class="scroll-x"><table class="tbl compact"><thead><tr><th>Empresa</th><th class="r">NFS-e</th><th class="r">Faturamento</th><th class="r">% do total</th><th class="r">ISSQN</th><th class="r">Tomadores</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total do filtro</td><td class="r">${NUM.format(S.sum.n)}</td><td class="r">${money(S.sum.vc)}</td><td class="r">${tot ? '100,0%' : '—'}</td><td class="r">${money(S.sum.ic)}</td><td class="r">${NUM.format(S.sum.tom)}</td></tr></tfoot></table></div></div>`;
+}
+function renderOverview() { renderKPIs(); renderTaxKPIs(); renderEmpCard(); renderEvolution(); renderDimCard(); renderContrCard(); renderTomChart(); renderCompare(); renderRank(); }
+
+/* ---------- Tabela ---------- */
+const sitBadge = s => `<span class="badge ${/paga|v[aá]lida/i.test(s) ? 'b-pos' : /cancel/i.test(s) ? 'b-neg' : /emitid/i.test(s) ? 'b-amber' : 'b-mute'}">${esc(s)}</span>`;
+const opBadge = s => `<span class="badge ${/^retido/i.test(s) ? 'b-brand' : /^n[aã]o retido/i.test(s) ? 'b-mute' : 'b-info'}">${esc(s)}</span>`;
+const SORTERS = { num: n => n.numInt, date: n => n.date || '', emp: n => fold(n.empName), tom: n => fold(n.tom), contr: n => fold(n.contr), cat: n => fold(n.cat), sit: n => fold(n.sit), op: n => fold(n.op), vc: n => n.vc, ic: n => n.ic, comp: n => n.ym || '', ret: n => fold(n.ret), liq: n => n.liq === null ? -1 : n.liq, irrf: n => n.irrf, csll: n => n.csll, inss: n => n.inss, cbs: n => n.cbs, ibs: n => n.ibs, bc: n => n.bc === null ? -1 : n.bc, key: n => n.key };
+function sortedList() {
+  const { sort, dir } = S.tbl, f = SORTERS[sort] || SORTERS.date, m = dir === 'asc' ? 1 : -1;
+  return [...S.filtered].sort((a, b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * m || (b.numInt - a.numInt); });
+}
+function tableCols() {
+  const A = S.avail, tx = TAXES.slice(1).filter(x => A.tax[x.k]);
+  return [
+    { id: 'num', l: 'Nº NFS-e', h: n => esc(n.num) },
+    { id: 'comp', l: 'Competência', h: n => fmtComp(n.ym) },
+    { id: 'date', l: 'Data de emissão', h: n => fmtDate(n.date) },
+    ...(isConsolidated() ? [{ id: 'emp', l: 'Empresa', h: n => `<span class="text-xs">${esc(n.empName)}</span>`, cls: 'wrap' }] : []),
+    { id: 'tom', l: 'Tomador', h: n => `<div class="font-medium">${esc(n.tom)}</div><div class="muted text-xs">${esc(n.doc)}</div>`, cls: 'wrap' },
+    { id: 'contr', l: 'Contratação', h: n => n.contr ? esc(n.contr) : '<span class="muted">—</span>' },
+    { id: 'cat', l: 'Tipo de serviço', h: n => esc(n.cat) },
+    { id: 'sit', l: 'Situação', h: n => sitBadge(n.sit) },
+    { id: 'ret', l: 'Retenção ISSQN', h: n => opBadge(n.ret) },
+    { id: 'vc', l: 'Vlr. Serviço', r: 1, h: n => money(n.vc), tot: s => money(s.vc) },
+    { id: 'ic', l: 'ISSQN', r: 1, h: n => money(n.ic), tot: s => money(s.ic) },
+    ...tx.map(x => ({ id: x.k, l: x.short, r: 1, h: n => n[x.k] ? money(n[x.k]) : '—', tot: s => money(s[x.k]) })),
+    ...(A.hasBase ? [{ id: 'bc', l: 'Base de cálculo', r: 1, h: n => n.bc === null ? '—' : money(n.bc), tot: s => s.nb ? money(s.bc) : '—' }] : []),
+    ...(A.hasLiq ? [{ id: 'liq', l: 'Valor líquido', r: 1, h: n => n.liq === null ? '—' : money(n.liq) }] : []),
+    { id: 'key', l: 'Chave da Nota', h: n => `<span class="mono muted" title="${esc(n.key)}">${esc(n.key.slice(0, 6))}…${esc(n.key.slice(-8))}</span>` },
+  ];
+}
+function renderTable() {
+  const list = sortedList(), total = list.length, printAll = S.printing && S.view === 'table';
+  const size = printAll ? Math.min(total, 5000) || 1 : S.tbl.size, pages = Math.max(1, Math.ceil(total / size));
+  S.tbl.page = Math.min(Math.max(1, S.tbl.page), pages);
+  const start = printAll ? 0 : (S.tbl.page - 1) * size, rows = list.slice(start, start + size), cols = tableCols(), hb = S.avail.hasBase;
+  const th = c => `<th class="${c.r ? 'r' : ''}" data-action="sort" data-k="${c.id}" aria-sort="${S.tbl.sort === c.id ? (S.tbl.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">${c.l}${S.tbl.sort === c.id ? `<span class="muted"> ${S.tbl.dir === 'asc' ? '▲' : '▼'}</span>` : ''}</th>`;
+  const body = rows.map(n => `<tr data-action="row" data-k="${esc(n.key)}">${cols.map(c => `<td class="${(c.r ? 'r ' : '') + (c.cls || '')}">${c.h(n)}</td>`).join('')}</tr>`).join('');
+  const s = S.sum, fi = Math.max(0, cols.findIndex(c => c.tot));
+  $('#tbl-wrap').innerHTML = `<table class="tbl"><thead><tr>${cols.map(th).join('')}</tr></thead><tbody>${body || `<tr><td colspan="${cols.length}" class="muted" style="padding:2rem;text-align:center">Nenhuma NFS-e no filtro atual.</td></tr>`}</tbody><tfoot><tr><td colspan="${fi}">Total do filtro (${NUM.format(total)} NFS-e)</td>${cols.slice(fi).map(c => `<td class="${c.r ? 'r' : ''}">${c.tot ? c.tot(s) : ''}</td>`).join('')}</tr></tfoot></table>`;
+  $('#tbl-sub').textContent = `${NUM.format(total)} notas no filtro atual. Clique no cabeçalho para ordenar e na linha para ver os detalhes.` + (printAll && total > 5000 ? ' A impressão mostra as 5.000 primeiras.' : '');
+  const from = total ? start + 1 : 0, to = Math.min(total, start + size), p = S.tbl.page;
+  const pb = (pg, l, dis, cur) => `<button class="btn btn-sm" ${dis ? 'disabled' : ''} ${cur ? 'aria-current="page" style="background:var(--brand);color:var(--brand-ink);border-color:var(--brand)"' : ''} data-action="page" data-p="${pg}">${l}</button>`;
+  const nums = []; for (let i = Math.max(1, p - 2); i <= Math.min(pages, p + 2); i++) nums.push(pb(i, i, false, i === p));
+  $('#pager').innerHTML = `<span class="muted text-sm">Mostrando ${NUM.format(from)} a ${NUM.format(to)} de ${NUM.format(total)}</span><div class="flex flex-wrap items-center gap-1">${pb(1, '«', p === 1)}${pb(p - 1, '‹', p === 1)}${nums.join('')}${pb(p + 1, '›', p === pages)}${pb(pages, '»', p === pages)}</div>`;
+  $('#t-size').value = String(S.tbl.size);
+}
+function openModal(key) {
+  const n = S.byKey.get(key) || S.byKeyAll.get(key); if (!n) return;
+  const row = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : '';
+  $('#modal-body').innerHTML = `<div class="flex items-start justify-between gap-3 border-b p-4" style="border-color:var(--line)"><div><h3 class="t-title">NFS-e ${esc(n.num)}</h3><p class="t-sub">${esc(n.tom)}</p></div><button class="btn btn-ghost btn-sm" data-close aria-label="Fechar">${ico('x')}</button></div>
+  <div class="p-4"><dl class="dl">
+    ${S.companies.length > 1 ? row('Empresa', esc(n.empName)) : ''}${row('Competência', fmtComp(n.ym)) + row('Data de emissão', fmtDate(n.date))}${row('Situação', sitBadge(n.sit))}${row('Operação', esc(n.op))}${row('Retenção ISSQN', opBadge(n.ret))}${n.nbs ? row('NBS', esc(n.nbs)) : ''}
+    ${row('Tomador', esc(n.tom))}${row('CPF/CNPJ', esc(n.doc) + ` <span class="muted">(${n.tipo.toLowerCase()})</span>`)}
+    ${row('Vlr. Serviço', `<b class="font-medium">${money(n.vc)}</b>`)}${n.bc !== null ? row('Base de cálculo', money(n.bc)) : ''}${row('Vlr. ISSQN', `<b class="font-medium">${money(n.ic)}</b>`)}
+    ${n.bc ? row('Alíquota efetiva', pct(n.ic / n.bc, 2) + ' <span class="muted">(ISSQN ÷ base)</span>') : ''}
+    ${TAXES.slice(1).map(x => n[x.k] ? row(x.label, money(n[x.k])) : '').join('')}
+    ${n.contr ? row('Tipo de contratação', esc(n.contr)) : ''}${row('Tipo de serviço', `${esc(n.cat)}${n.srv ? ` <span class="muted">(${esc(n.srv)})</span>` : ''}`)}${row('Descrição', esc(n.desc))}
+    ${row('Chave da Nota', `<span class="mono">${esc(n.key)}</span> <button class="btn btn-sm" data-action="copy" data-v="${esc(n.key)}" style="margin-left:.4rem">${ico('copy')}Copiar</button>`)}
+    ${n.liq !== null ? row('Valor líquido', money(n.liq)) : ''}${row('Evento', esc(n.ev))}
+  </dl></div>`;
+  $('#modal').classList.remove('hidden');
+}
+const closeModal = () => $('#modal').classList.add('hidden');
+
+/* ---------- Validação ---------- */
+function structureNotes(s) {
+  const out = [], miss = FIELDS.filter(f => f.std && !s.cols[f.id]).map(f => f.label);
+  out.push('Estrutura LOTE_NNAC (abas NFS-e, Resumo e Log). Os nomes das colunas seguem o padrão do projeto. Particularidades: Competência e Data de Emissão vêm como data; Operação traz a descrição do serviço; a retenção do ISSQN está em ISS Retido; Situação só traz “Válida”; não há linha de total (a conferência usa a aba Resumo).');
+  if (miss.length) out.push(`Colunas padrão ausentes: ${miss.join(', ')}.`);
+  const al = FIELDS.filter(f => s.cols[f.id] && norm(s.cols[f.id].header) !== norm(f.label)).map(f => `“${s.cols[f.id].header}” → ${f.label}`);
+  if (al.length) out.push(`Nomes diferentes do padrão, mapeados automaticamente: ${al.join('; ')}.`);
+  const ex = FIELDS.filter(f => !f.std && s.cols[f.id]).map(f => f.label);
+  if (ex.length) out.push(`Colunas além do padrão: ${ex.join(', ')}.`);
+  if (s.unknown.length) out.push(`Colunas não reconhecidas (ignoradas): ${s.unknown.join(', ')}.`);
+  if (s.kind === 'analitica' && (s.rep.ffill || s.rep.skipped.subtotal)) out.push('Estrutura em blocos por tomador: tomador e CPF/CNPJ só na primeira nota do grupo e linhas “Totais” intercaladas (tratados).');
+  if (!out.length) out.push('Estrutura idêntica ao padrão.');
+  return out;
+}
+function renderValidation() {
+  const V = S.V, kn = () => 'Lote NNAC';
+  const files = S.sources.map((s, i) => `<div class="rounded-lg border p-3" style="border-color:var(--line)">
+    <div class="mb-2 flex items-start justify-between gap-2"><div class="min-w-0"><div class="truncate font-medium" title="${esc(s.name)}">${esc(s.name)}</div><span class="badge ${s.kind === 'sintetica' ? 'b-brand' : 'b-info'} mt-1">${kn(s.kind)}</span> <span class="muted text-xs">${s.emps && s.emps.length > 1 ? s.emps.length + ' empresas' : esc(s.empName)}</span></div><button class="btn btn-ghost btn-sm no-print" data-action="remove-source" data-v="${esc(s.name)}" title="Remover este arquivo">${ico('trash')}</button></div>
+    <dl class="dl"><dt>Planilha</dt><dd>${esc(s.sheet)}, cabeçalho na linha ${s.headerRow}</dd><dt>Linhas lidas</dt><dd>${NUM.format(s.rep.rowsRead)}</dd><dt>NFS-e válidas</dt><dd><b class="font-medium">${NUM.format(s.records.length)}</b></dd>
+    <dt>Ignoradas</dt><dd>${NUM.format(s.rep.skipped.subtotal)} subtotais, ${NUM.format(s.rep.skipped.footer)} de rodapé, ${NUM.format(s.rep.skipped.blank)} em branco</dd></dl>
+    <ul class="muted mt-2 list-disc space-y-1 pl-5 text-xs">${structureNotes(s).map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>`).join('');
+  const colH = S.sources.map(s => `<th>${kn(s.kind)}</th>`).join('');
+  const struct = FIELDS.map(f => `<tr><td class="font-medium">${f.label}${f.std ? '' : ' <span class="muted text-xs">(extra)</span>'}</td><td class="muted">${f.role}</td>${S.sources.map(s => { const c = s.cols[f.id]; return `<td>${c ? `${stIcon('ok')} ${esc(c.header)}` : `<span class="muted">${f.std ? stIcon('warn') + ' ausente' : '—'}</span>`}</td>`; }).join('')}</tr>`).join('');
+  const recon = V.recon.map(r => r.all === undefined ? `<tr><td>${esc(r.file)}</td><td colspan="5">${stIcon(r.status)} ${esc(r.text)}</td></tr>` : `<tr><td class="wrap">${esc(r.file)}</td><td>${r.metric}</td><td class="r">${money(r.all)}</td><td class="r">${r.hasCanc ? money(r.exc) : '<span class="muted">igual</span>'}</td><td class="r">${money(r.foot)}</td><td class="wrap">${stIcon(r.status)} ${esc(r.text)}</td></tr>`).join('');
+  const cr = V.cross ? `<div class="card"><div class="card-h"><div><h3 class="t-title">Cruzamento pela Chave da Nota</h3><p class="t-sub">Sintética e Analítica comparadas nota a nota.</p></div></div><div class="card-b">
+    <div class="grid gap-3 sm:grid-cols-3"><div class="rounded-lg border p-3" style="border-color:var(--line)"><div class="muted text-xs">Nas duas planilhas</div><div class="text-xl font-semibold">${NUM.format(V.cross.both)}</div></div><div class="rounded-lg border p-3" style="border-color:var(--line)"><div class="muted text-xs">Só na Sintética</div><div class="text-xl font-semibold">${NUM.format(V.cross.onlyS)}</div></div><div class="rounded-lg border p-3" style="border-color:var(--line)"><div class="muted text-xs">Só na Analítica</div><div class="text-xl font-semibold">${NUM.format(V.cross.onlyA)}</div></div></div>
+    <ul class="mt-3 space-y-1.5 text-sm">${Object.entries(V.cross.div).map(([k, v]) => `<li class="flex items-start gap-2">${stIcon(v ? 'warn' : 'ok')}<span>${k}: ${v ? `<b class="font-medium">${NUM.format(v)} divergências</b>` : 'sem divergências'}</span></li>`).join('')}</ul>
+    ${V.cross.examples.length ? `<p class="muted mt-2 text-xs">Exemplos: ${V.cross.examples.slice(0, 8).map(e => `nº ${esc(e.num)} (${e.campos.join(', ')})`).join('; ')}.</p>` : ''}
+    <p class="muted mt-2 text-xs">Campos exclusivos da Analítica (base de cálculo, serviço, descrição) são anexados às notas pela chave. Em caso de divergência, vale a Sintética.</p></div></div>` : '';
+  const rsRows = (V.resumo || []).map(r => `<tr><td class="wrap">${esc(r.file)}</td><td>${esc(r.label)}</td><td class="r">${esc(r.dash)}</td><td class="r">${esc(r.res)}</td><td>${stIcon(r.status)} ${r.status === 'ok' ? 'Confere' : 'Não confere'}</td></tr>`).join('');
+  const rsCard = rsRows ? `<div class="card"><div class="card-h"><div><h3 class="t-title">Conferência com a aba Resumo</h3><p class="t-sub">Totais calculados pelo dashboard (todas as NFS-e, sem filtros) comparados com o controle da aba “Resumo” do arquivo.</p></div></div><div class="card-b !px-0"><div class="scroll-x"><table class="tbl compact"><thead><tr><th>Arquivo</th><th>Indicador</th><th class="r">Dashboard</th><th class="r">Resumo</th><th>Resultado</th></tr></thead><tbody>${rsRows}</tbody></table></div></div></div>` : '';
+  const q = V.quality.map(x => `<li class="flex items-start gap-2.5 border-b py-2.5 last:border-0" style="border-color:var(--line)">${stIcon(x.status)}<div class="min-w-0 flex-1"><div class="flex flex-wrap items-baseline justify-between gap-x-3"><span class="font-medium">${esc(x.label)}</span><span class="text-sm">${esc(x.value)}</span></div>${x.detail ? `<p class="muted mt-0.5 text-xs leading-relaxed">${esc(x.detail)}</p>` : ''}</div></li>`).join('');
+  const IC = integrityChecks(S.filtered);
+  const ic = IC.checks.map(c => `<li class="flex items-start gap-2.5 py-1.5">${stIcon(c.ok ? 'ok' : 'err')}<span class="flex-1">${c.label}</span><span class="muted text-sm">${money(c.vc)}, ${NUM.format(c.n)} NFS-e</span></li>`).join('');
+  $('#view-validation').innerHTML = `
+    <div class="card"><div class="card-h"><div><h3 class="t-title">Arquivos lidos</h3><p class="t-sub">${NUM.format(S.notes.length)} NFS-e únicas no total. A relação entre as planilhas é a Chave da Nota.</p></div></div><div class="card-b"><div class="grid gap-3 md:grid-cols-2">${files}</div></div></div>
+    <div class="card"><div class="card-h"><div><h3 class="t-title">Estrutura detectada</h3><p class="t-sub">Como cada coluna foi interpretada, comparada com a estrutura padrão.</p></div></div><div class="card-b !px-0"><div class="scroll-x"><table class="tbl compact"><thead><tr><th>Campo</th><th>Papel</th>${colH}</tr></thead><tbody>${struct}</tbody></table></div></div></div>
+    <div class="card"><div class="card-h"><div><h3 class="t-title">Totais conferidos com o rodapé dos arquivos</h3><p class="t-sub">O rodapé “Valor total das notas emitidas” é recalculado a partir das notas lidas.</p></div></div><div class="card-b !px-0"><div class="scroll-x"><table class="tbl compact"><thead><tr><th>Arquivo</th><th>Indicador</th><th class="r">Soma de todas</th><th class="r">Sem canceladas</th><th class="r">Rodapé</th><th>Resultado</th></tr></thead><tbody>${recon}</tbody></table></div></div></div>
+    ${rsCard}${cr}
+    <div class="grid gap-4 pg5 lg:grid-cols-5"><div class="card lg:col-span-3"><div class="card-h"><div><h3 class="t-title">Qualidade dos dados</h3><p class="t-sub">Nada foi alterado nos dados originais. Tratamentos ficam registrados aqui.</p></div></div><div class="card-b"><ul>${q}</ul></div></div>
+    <div class="card lg:col-span-2 self-start"><div class="card-h"><div><h3 class="t-title">Consistência do dashboard</h3><p class="t-sub">Com os filtros atuais, as somas por grupo precisam fechar com o total exibido (${money(IC.total.vc)}).</p></div></div><div class="card-b"><ul class="text-sm">${ic}</ul></div></div></div>`;
+}
+
+/* ---------- Exportação ---------- */
+const serial = iso => (Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) - Date.UTC(1899, 11, 30)) / 86400000;
+/* Planilha a partir de linhas; cada célula pode ser valor simples ou {v, t} com t em money|int|pct|date|text. */
+function mkSheet(headers, rows, types, widths) {
+  const ws = {};
+  headers.forEach((h, c) => { ws[XLSX.utils.encode_cell({ r: 0, c })] = { t: 's', v: h }; });
+  rows.forEach((row, r) => row.forEach((cell, c) => {
+    let v = cell, ty = types[c];
+    if (cell && typeof cell === 'object' && 't' in cell) { v = cell.v; ty = cell.t; }
+    if (v === null || v === undefined || v === '') return;
+    const ref = XLSX.utils.encode_cell({ r: r + 1, c });
+    if (ty === 'money') ws[ref] = { t: 'n', v, z: '#,##0.00' };
+    else if (ty === 'int') ws[ref] = { t: 'n', v, z: '#,##0' };
+    else if (ty === 'pct') ws[ref] = { t: 'n', v, z: '0.00%' };
+    else if (ty === 'date') ws[ref] = { t: 'n', v: serial(v), z: 'dd/mm/yyyy' };
+    else ws[ref] = { t: 's', v: String(v) };
+  }));
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(rows.length, 0), c: headers.length - 1 } });
+  ws['!cols'] = widths.map(w => ({ wch: w }));
+  return ws;
+}
+function exportXlsx() {
+  if (typeof XLSX === 'undefined') { toast('A biblioteca SheetJS não foi carregada.'); return; }
+  const wb = XLSX.utils.book_new(), t = S.sum, m = S.meta, hb = S.avail.hasBase, list = sortedList();
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  /* Resumo */
+  const res = [['Empresa', m.empresa || ''], ['CPF/CNPJ', m.cnpj || ''], ['Período do relatório', m.periodoDe ? `${m.periodoDe} a ${m.periodoAte}` : ''], ['Gerado em', new Date().toLocaleString('pt-BR')], ['', ''], ['Filtros aplicados', ''],
+    ...describeFilters().map(x => ['', x]), ['', ''], ['Indicador', 'Valor'],
+    ['Faturamento (soma de Vlr. Serviço)', { v: t.vc / 100, t: 'money' }], ['ISSQN (soma de Valor do ISSQN)', { v: t.ic / 100, t: 'money' }], ...TAXES.slice(1).filter(x => S.avail.tax[x.k]).map(x => [x.label, { v: t[x.k] / 100, t: 'money' }]), ['NFS-e', { v: t.n, t: 'int' }], ['Tomadores distintos (CPF/CNPJ)', { v: t.tom, t: 'int' }],
+    ['Ticket médio', { v: t.n ? t.vc / t.n / 100 : 0, t: 'money' }], ['ISSQN ÷ Faturamento', { v: t.vc ? t.ic / t.vc : 0, t: 'pct' }]];
+  if (t.nb) res.push(['Base de cálculo', { v: t.bc / 100, t: 'money' }]);
+  res.push(['', ''], ['Arquivos de origem', S.sources.map(s => `${s.name} (Lote NNAC)`).join('; ')]);
+  XLSX.utils.book_append_sheet(wb, mkSheet(['Dashboard de faturamento NFS-e', ''], res, ['text', 'text'], [38, 70]), 'Resumo');
+  /* NFS-e */
+  const cons = isConsolidated(), cat = hasCat();
+  const XC = [
+    ...(cons ? [{ h: 'Empresa', t: 'text', w: 40, g: n => n.empName }] : []),
+    { h: 'Chave da Nota', t: 'text', w: 54, g: n => n.key }, { h: 'Nº NFS-e', t: 'text', w: 11, g: n => n.num }, { h: 'Competência', t: 'text', w: 13, g: n => fmtComp(n.ym) }, { h: 'Data de Emissão', t: 'date', w: 13, g: n => n.date },
+    { h: 'CPF/CNPJ', t: 'text', w: 20, g: n => n.doc }, { h: 'Tomador', t: 'text', w: 52, g: n => n.tom }, { h: 'Tipo de contratação (Plano de Saúde)', t: 'text', w: 22, g: n => n.contr },
+    { h: 'Situação', t: 'text', w: 11, g: n => n.sit }, { h: 'Operação', t: 'text', w: 50, g: n => n.op }, { h: 'Retenção ISSQN', t: 'text', w: 22, g: n => n.ret },
+    { h: 'Vlr. Serviço', t: 'money', w: 16, g: n => n.vc / 100, tot: t.vc }, { h: 'Vlr. ISSQN', t: 'money', w: 14, g: n => n.ic / 100, tot: t.ic },
+    ...TAXES.slice(1).filter(x => S.avail.tax[x.k]).map(x => ({ h: x.label, t: 'money', w: 18, g: n => n[x.k] / 100, tot: t[x.k] })),
+    ...(S.avail.hasLiq ? [{ h: 'Valor Líquido', t: 'money', w: 16, g: n => n.liq === null ? null : n.liq / 100 }] : []),
+    ...(hb ? [{ h: 'Base de Cálculo', t: 'money', w: 16, g: n => n.bc === null ? null : n.bc / 100, tot: t.bc }] : []),
+    ...(cat ? [{ h: 'Tipo de serviço', t: 'text', w: 20, g: n => n.cat }, { h: 'Nome do Serviço', t: 'text', w: 50, g: n => n.srv }] : []),
+  ];
+  const rows = list.map(n => XC.map(c => c.g(n)));
+  const wsN = mkSheet(XC.map(c => c.h), rows, XC.map(c => c.t), XC.map(c => c.w)), tr = rows.length + 1, col = c => XLSX.utils.encode_col(c);
+  const iv = XC.findIndex(c => c.h === 'Vlr. Serviço');
+  wsN[XLSX.utils.encode_cell({ r: tr, c: iv - 1 })] = { t: 's', v: 'Total' };
+  XC.forEach((c, i) => { if (c.tot !== undefined) wsN[XLSX.utils.encode_cell({ r: tr, c: i })] = { t: 'n', f: `SUM(${col(i)}2:${col(i)}${rows.length + 1})`, v: c.tot / 100, z: '#,##0.00' }; });
+  wsN['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: tr, c: XC.length - 1 } });
+  wsN['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: XC.length - 1 } }) };
+  XLSX.utils.book_append_sheet(wb, wsN, 'NFS-e');
+  /* Agrupamentos */
+  const g = curGran(), per = seriesByPeriod(S.filtered, g).rows;
+  const pLabel = r => g === 'mes' ? fmtComp(r.key) : g === 'semana' ? `${fmtDate(r.key)} a ${fmtDate(addDays(r.key, 6))}` : fmtDate(r.key);
+  XLSX.utils.book_append_sheet(wb, mkSheet([g === 'mes' ? 'Competência' : g === 'semana' ? 'Semana' : 'Dia', 'Faturamento', ...TAXES.filter(z => S.avail.tax[z.k]).map(x => x.label), 'NFS-e'], per.map(r => [pLabel(r), r.vc / 100, ...TAXES.filter(z => S.avail.tax[z.k]).map(x => r[x.k] / 100), r.n]), ['text', 'money', ...TAXES.filter(z => S.avail.tax[z.k]).map(() => 'money'), 'int'], [24, 18, ...TAXES.filter(z => S.avail.tax[z.k]).map(() => 18), 10]), 'Por período');
+  const tg = groupBy(S.filtered, n => n.tomKey).sort((a, b) => b.vc - a.vc);
+  XLSX.utils.book_append_sheet(wb, mkSheet(['#', 'Tomador', 'CPF/CNPJ', 'Faturamento', ...TAXES.filter(z => S.avail.tax[z.k]).map(x => x.label), 'NFS-e', '% do faturamento'], tg.map((x, i) => [i + 1, S.tom.get(x.key).name, S.tom.get(x.key).doc, x.vc / 100, ...TAXES.filter(z => S.avail.tax[z.k]).map(y => x[y.k] / 100), x.n, t.vc ? x.vc / t.vc : 0]), ['int', 'text', 'text', 'money', ...TAXES.filter(z => S.avail.tax[z.k]).map(() => 'money'), 'int', 'pct'], [6, 56, 20, 18, ...TAXES.filter(z => S.avail.tax[z.k]).map(() => 18), 10, 16]), 'Por tomador');
+  const dimSheet = (name, fn, label, src) => { src = src || S.filtered; const tv = src.reduce((a, n) => a + n.vc, 0); return XLSX.utils.book_append_sheet(wb, mkSheet([label, 'Faturamento', 'ISSQN', 'NFS-e', '% do faturamento'], groupBy(src, fn).sort((a, b) => b.vc - a.vc).map(x => [x.key, x.vc / 100, x.ic / 100, x.n, tv ? x.vc / tv : 0]), ['text', 'money', 'money', 'int', 'pct'], [28, 18, 16, 10, 16]), name); };
+  if (isConsolidated()) dimSheet('Por empresa', n => n.empName, 'Empresa'); dimSheet('Por retenção ISSQN', n => n.ret, 'Retenção ISSQN'); dimSheet('Por situação', n => n.sit, 'Situação'); dimSheet('Contratação (Plano Saúde)', n => n.contr, 'Tipo de contratação', S.filtered.filter(n => n.cat === 'Plano de Saúde')); if (cat) dimSheet('Por tipo de serviço', n => n.cat, 'Tipo de serviço');
+  /* Validação */
+  const vr = [...S.V.quality.map(q => ['Qualidade', q.label, q.value, q.detail]), ...(S.V.resumo || []).map(r => ['Resumo', `${r.file}: ${r.label}`, r.status === 'ok' ? 'Confere' : 'Não confere', `Dashboard: ${r.dash}; Resumo: ${r.res}`]), ...S.V.recon.map(r => ['Rodapé', `${r.file}: ${r.metric}`, r.status === 'ok' ? 'Confere' : r.status === 'err' ? 'Não confere' : 'Sem rodapé', r.text])];
+  XLSX.utils.book_append_sheet(wb, mkSheet(['Seção', 'Verificação', 'Resultado', 'Detalhe'], vr, ['text', 'text', 'text', 'text'], [12, 52, 26, 100]), 'Validação');
+  XLSX.writeFile(wb, `NFSe_${slug(m.empresa || 'dashboard')}_${stamp}.xlsx`);
+  toast('Planilha Excel gerada');
+}
+function renderPrintHead() {
+  const m = S.meta;
+  $('#print-head').innerHTML = `<div style="border-bottom:2px solid #0d6b73;padding-bottom:8px;margin-bottom:10px"><div style="font-size:18px;font-weight:600">Dashboard de faturamento NFS-e${S.view === 'grupo' ? ' | Faturamento entre empresas do Grupo' : ''}</div>
+    <div style="font-size:12px;color:#37495a">${esc([m.empresa, m.cnpj ? 'CNPJ ' + m.cnpj : '', m.periodoDe ? `competência ${m.periodoDe} a ${m.periodoAte}` : ''].filter(Boolean).join(', '))}</div>
+    <div style="font-size:11px;color:#5b6d79;margin-top:3px">Filtros: ${esc((S.view === 'grupo' ? describeG() : describeFilters()).join(' | '))}. Gerado em ${new Date().toLocaleString('pt-BR')}.</div></div>`;
+}
+function exportPDF() {
+  S.wasDark = document.documentElement.classList.contains('dark');
+  S.printing = true;
+  if (S.wasDark) document.documentElement.classList.remove('dark');
+  renderPrintHead(); renderActiveView();
+  toast('Na janela de impressão, escolha “Salvar como PDF”.');
+  setTimeout(() => window.print(), 450);
+}
+window.addEventListener('afterprint', () => {
+  if (!S.printing) return;
+  S.printing = false; if (S.wasDark) document.documentElement.classList.add('dark');
+  if (S.notes.length) renderActiveView();
+});
+
+/* =====================================================================
+   ABA GRUPO: faturamento entre empresas do Grupo
+   Regra: é intragrupo a NFS-e cujo emitente E cujo tomador são empresas do Grupo,
+   comparando o CNPJ completo (14 dígitos).
+   Grupo = cadastro abaixo + emitentes encontrados nos arquivos carregados.
+   A aba usa todos os emitentes dos arquivos, independente da empresa escolhida
+   no seletor do topo, e tem filtros próprios (competência e situação).
+   ===================================================================== */
+const GRUPO = [
+  { cnpj: '04814289000133', nome: 'TRPO Atividades Profissionais Ltda',                    curto: 'TRPO' },
+  { cnpj: '04159778000107', nome: 'Samel Serviços de Assistência Médico Hospitalar Ltda', curto: 'Samel Hospitalar' },
+  { cnpj: '06078081000129', nome: 'RMR Serviços Médicos Ltda',                             curto: 'RMR' },
+  { cnpj: '45416657000172', nome: 'Health.D Tecnologia em Saúde Ltda',                     curto: 'Health.D' },
+  { cnpj: '51689574000150', nome: 'Z. F. Serviços Médicos e Hospitalares Ltda',            curto: 'Z.F.' },
+  { cnpj: '84537141000138', nome: 'Samel Plano de Saúde Ltda',                             curto: 'Samel Plano' },
+];
+const GRUPO_FOCO = '84537141000138';   /* tomador em foco por padrão: Samel Plano de Saúde */
+const gKey = (a, b) => a + '>' + b;
+
+/* Empresas do Grupo: cadastro + emitentes encontrados nos arquivos. "emite" = aparece como emitente nos arquivos. */
+function gMembers() {
+  const found = new Set(S.companies.map(c => c.emp));
+  const list = GRUPO.map(g => ({ ...g, cad: true, emite: found.has(g.cnpj) }));
+  for (const c of S.companies) if (!GRUPO.some(g => g.cnpj === c.emp)) list.push({ cnpj: c.emp, nome: c.name, curto: trunc(c.name, 26), cad: false, emite: true });
+  return list;
+}
+function gDefaults() {
+  const sit = new Set(); for (const n of S.allNotes) if (!isCancel(n.sit)) sit.add(n.sit);
+  return { month: '', sit, foco: GRUPO_FOCO, tblAll: false, scope: 'prest' };
+}
+function gScope() {
+  const F = S.G, M = gMembers(), mset = new Set(M.map(m => m.cnpj));
+  const pair = n => mset.has(n.emp) && mset.has(n.docD) && n.emp !== n.docD;
+  const period = S.allNotes.filter(n => !F.month || n.ym === F.month);
+  const base = period.filter(n => F.sit.has(n.sit));
+  return { F, M, mset, pair, period, base, intra: base.filter(pair), rest: base.filter(n => !pair(n)) };
+}
+function describeG() {
+  const F = S.G, o = [], all = [...new Set(S.allNotes.map(n => n.sit))];
+  o.push('Situação: ' + (all.every(x => F.sit.has(x)) ? 'todas' : ([...F.sit].join(', ') || 'nenhuma')));
+  if (F.month) o.push('Competência: ' + fmtComp(F.month));
+  const f = gMembers().find(m => m.cnpj === F.foco); if (f) { o.push('Tomador em foco: ' + f.curto); o.push('Faturamento por competência: ' + (F.scope === 'todas' ? 'todas as empresas emitentes' : 'emitentes exceto ' + f.curto)); }
+  return o;
+}
+
+function renderGrupo() {
+  const el = $('#view-grupo'); if (!el || !S.G) return;
+  if (charts['c-grupo']) { charts['c-grupo'].destroy(); delete charts['c-grupo']; }
+  const X = gScope(), { F, M, mset, pair, base, intra, rest } = X, th = theme(), P = pal();
+  const byC = new Map(M.map(m => [m.cnpj, m]));
+  const nm = c => (byC.get(c) || {}).curto || fmtCnpj(c), full = c => (byC.get(c) || {}).nome || fmtCnpj(c);
+  const colorOf = c => P[Math.max(0, M.findIndex(m => m.cnpj === c)) % P.length];
+  const foco = byC.has(F.foco) ? F.foco : M[0].cnpj, fn = nm(foco);
+
+  const tB = summarize(base), tI = summarize(intra), tR = summarize(rest);
+  const toFoco = intra.filter(n => n.docD === foco), tF = summarize(toFoco);
+  const emitters = M.filter(m => m.emite), missing = M.filter(m => m.cad && !m.emite);
+
+  /* ---- filtros próprios ---- */
+  const months = [...new Set(S.allNotes.map(n => n.ym).filter(Boolean))].sort();
+  const sitCnt = new Map(); for (const n of S.allNotes) { const c = sitCnt.get(n.sit) || { v: n.sit, n: 0 }; if (X.pair(n)) c.n++; sitCnt.set(n.sit, c); }
+  const sits = [...sitCnt.values()].sort((a, b) => b.n - a.n || a.v.localeCompare(b.v));
+  const filtersHtml = `<section class="card no-print"><div class="g-filters">
+    <div class="g-f"><label class="lbl" for="g-month">Competência</label><select id="g-month" class="inp"><option value="">Todas</option>${months.map(m => `<option value="${m}" ${m === F.month ? 'selected' : ''}>${fmtComp(m)}</option>`).join('')}</select></div>
+    <div class="g-f"><label class="lbl" for="g-foco">Tomador em foco</label><select id="g-foco" class="inp">${M.map(m => `<option value="${m.cnpj}" ${m.cnpj === foco ? 'selected' : ''} title="${esc(m.nome)}">${esc(m.curto)}</option>`).join('')}</select></div>
+    <div class="g-f grow"><span class="lbl">Situação</span><div class="g-chips">${sits.map(x => `<button type="button" class="chip" aria-pressed="${F.sit.has(x.v)}" data-action="g-sit" data-v="${esc(x.v)}" title="NFS-e intragrupo nesta situação">${esc(x.v)} <span class="n">${NUM.format(x.n)}</span></button>`).join('')}</div></div>
+    <button class="btn btn-ghost" data-action="g-clear">${ico('x')}<span>Limpar</span></button>
+  </div></section>`;
+
+  const banner = missing.length ? `<div class="alert al-info no-print"><span class="ai">${ico('info')}</span><div><b class="font-medium">${esc(missing.map(m => m.curto).join(', '))}</b> ${missing.length === 1 ? 'não aparece' : 'não aparecem'} como emitente nos arquivos carregados. A matriz e o ranking passam a incluir ${missing.length === 1 ? 'essa empresa' : 'essas empresas'} quando a planilha for atualizada.</div></div>` : '';
+
+  /* ---- indicadores ---- */
+  const kpis = `<div class="card kpis kn" style="--kc:5">
+    <div class="kpi"><div class="kpi-l">Emitido para ${esc(fn)}</div><div class="kpi-v">${money(tF.vc)}</div><div class="kpi-s">${NUM.format(tF.n)} NFS-e${tI.vc ? ', ' + pct(tF.vc / tI.vc) + ' do intragrupo' : ''}</div></div>
+    <div class="kpi"><div class="kpi-l">Faturamento intragrupo</div><div class="kpi-v">${money(tI.vc)}</div><div class="kpi-s">Soma do Vlr. Serviço. ${tI.n ? 'Maior nota ' + money(tI.max) : 'Nenhuma NFS-e no filtro'}</div></div>
+    <div class="kpi"><div class="kpi-l">ISSQN intragrupo</div><div class="kpi-v">${money(tI.ic)}</div><div class="kpi-s">${tB.ic ? pct(tI.ic / tB.ic) + ' do ISSQN total' : '—'}</div></div>
+    <div class="kpi"><div class="kpi-l">NFS-e intragrupo</div><div class="kpi-v">${NUM.format(tI.n)}</div><div class="kpi-s">${tB.n ? pct(tI.n / tB.n, 2) + ' das ' + NUM.format(tB.n) + ' NFS-e' : '—'}</div></div>
+    <div class="kpi"><div class="kpi-l">% do faturamento total</div><div class="kpi-v">${tB.vc ? pct(tI.vc / tB.vc) : '—'}</div><div class="kpi-s">Total ${money(tB.vc)}. Terceiros ${money(tR.vc)}</div></div>
+  </div>`;
+
+  /* ---- faturamento por competência: total x emitido para o foco x terceiros ---- */
+  const monthsShown = F.month ? [F.month] : months;
+  const scoped = base.filter(n => mset.has(n.emp) && (F.scope === 'todas' || n.emp !== foco));
+  const cm = new Map();
+  for (const n of scoped) {
+    const k = n.ym || ''; let o = cm.get(k); if (!o) cm.set(k, o = { vc: 0, n: 0, fv: 0, fn: 0, tv: 0, tn: 0, og: 0, ogn: 0 });
+    o.vc += n.vc; o.n++;
+    if (n.docD === foco) { o.fv += n.vc; o.fn++; } else { o.tv += n.vc; o.tn++; if (mset.has(n.docD) && n.docD !== n.emp) { o.og += n.vc; o.ogn++; } }
+  }
+  const cmKeys = [...monthsShown, ...(cm.has('') ? [''] : [])];
+  const cmT = [...cm.values()].reduce((a, o) => { for (const k in a) a[k] += o[k]; return a; }, { vc: 0, n: 0, fv: 0, fn: 0, tv: 0, tn: 0, og: 0, ogn: 0 });
+  const cmEmps = [...new Set(scoped.map(n => n.emp))].sort((a, b) => M.findIndex(m => m.cnpj === a) - M.findIndex(m => m.cnpj === b));
+  const cn = (v, n) => v ? `${money(v)}<div class="muted text-xs">${NUM.format(n)} NFS-e</div>` : '<span class="muted">—</span>';
+  const cmRows = cmKeys.map(k => { const o = cm.get(k) || { vc: 0, n: 0, fv: 0, fn: 0, tv: 0, tn: 0 };
+    return `<tr><td class="font-medium">${k ? fmtComp(k) : 'Sem competência'}</td><td>${cn(o.vc, o.n)}</td><td class="g-focus">${cn(o.fv, o.fn)}</td><td>${cn(o.tv, o.tn)}</td><td>${o.vc ? pct(o.fv / o.vc) : '—'}</td></tr>`; }).join('');
+  const compHtml = `<div class="card"><div class="card-h"><div><h3 class="t-title">Faturamento por competência</h3><p class="t-sub">${cmEmps.length ? 'Emitentes: ' + esc(cmEmps.map(nm).join(', ')) + '. ' : ''}Vlr. Serviço. Terceiros é tudo o que não foi emitido para ${esc(fn)}.</p></div>
+    <div class="seg no-print" role="group" aria-label="Emitentes considerados"><button data-action="g-scope" data-v="prest" aria-pressed="${F.scope !== 'todas'}">Exceto ${esc(fn)}</button><button data-action="g-scope" data-v="todas" aria-pressed="${F.scope === 'todas'}">Todas as empresas</button></div></div>
+    <div class="card-b !px-0 !pb-0"><div class="scroll-x">${cm.size ? `<table class="tbl compact g-mx"><thead><tr><th>Competência</th><th>Faturamento</th><th class="g-focus">Emitidos para ${esc(fn)}</th><th>Emitidos para Terceiros</th><th>% para ${esc(fn)}</th></tr></thead><tbody>${cmRows}</tbody>
+      <tfoot><tr><td>Total</td><td>${money(cmT.vc)}</td><td class="g-focus">${money(cmT.fv)}</td><td>${money(cmT.tv)}</td><td>${cmT.vc ? pct(cmT.fv / cmT.vc) : '—'}</td></tr></tfoot></table>` : `<p class="muted g-empty">Nenhuma NFS-e emitida ${F.scope === 'todas' ? '' : 'por outras empresas '}no filtro atual.</p>`}</div>
+      ${cmT.og ? `<p class="muted text-xs" style="padding:10px 16px 14px">Dentro de Terceiros, ${money(cmT.og)} (${NUM.format(cmT.ogn)} NFS-e) são para outras empresas do Grupo.</p>` : ''}</div></div>`;
+
+  /* ---- gráfico por competência e ranking de emitentes ---- */
+  const rk = groupBy(toFoco, n => n.emp).sort((a, b) => b.vc - a.vc), rmax = rk.length ? rk[0].vc : 0;
+  const chartBox = toFoco.length ? `<div class="chart-box"><canvas id="c-grupo" role="img" aria-label="Faturamento emitido para ${esc(fn)} por competência"></canvas></div>`
+    : `<p class="muted g-empty">Nenhuma NFS-e emitida para ${esc(fn)} no filtro atual.</p>`;
+  const rkRows = rk.map(x => `<tr><td class="wrap"><div class="font-medium"><span class="dot" style="background:${colorOf(x.key)};margin-right:.4rem"></span>${esc(nm(x.key))}</div><div class="muted text-xs">${esc(fmtCnpj(x.key))}</div></td><td class="r">${NUM.format(x.n)}</td><td class="r">${money(x.vc)}<div class="g-bar"><span style="width:${rmax ? (x.vc / rmax * 100).toFixed(1) : 0}%"></span></div></td><td class="r">${pct(tF.vc ? x.vc / tF.vc : 0)}</td></tr>`).join('');
+  const rkHtml = `<div class="card"><div class="card-h"><div><h3 class="t-title">Emitentes para ${esc(fn)}</h3><p class="t-sub">Ranking das empresas do Grupo que emitiram NFS-e para ${esc(fn)}.</p></div></div>
+    <div class="card-b !px-0 !pb-0"><div class="scroll-x">${rk.length ? `<table class="tbl compact"><thead><tr><th>Emitente</th><th class="r">NFS-e</th><th class="r">Faturamento</th><th class="r">% do total</th></tr></thead><tbody>${rkRows}</tbody>
+      <tfoot><tr><td>Total</td><td class="r">${NUM.format(tF.n)}</td><td class="r">${money(tF.vc)}</td><td class="r">${tF.vc ? '100,0%' : '—'}</td></tr></tfoot></table>` : `<p class="muted g-empty">Sem NFS-e emitidas para ${esc(fn)}.</p>`}</div>
+      ${rk.length === 1 && missing.length ? `<p class="muted text-xs" style="padding:10px 16px 14px">Hoje só ${esc(nm(rk[0].key))} emitiu para ${esc(fn)}. As demais empresas entram no ranking quando suas notas forem carregadas.</p>` : ''}</div></div>`;
+
+  /* ---- matriz emitente x tomador ---- */
+  const cell = new Map(groupBy(intra, n => gKey(n.emp, n.docD)).map(g => [g.key, g]));
+  const rowTot = new Map(groupBy(intra, n => n.emp).map(g => [g.key, g])), colTot = new Map(groupBy(intra, n => n.docD).map(g => [g.key, g]));
+  const mmax = Math.max(0, ...[...cell.values()].map(g => g.vc));
+  const mxHead = M.map(m => `<th class="${m.cnpj === foco ? 'g-focus' : ''}" title="${esc(m.nome)}">${esc(m.curto)}</th>`).join('');
+  const mxBody = emitters.map(e => `<tr><td class="font-medium" title="${esc(e.nome)}"><span class="dot" style="background:${colorOf(e.cnpj)};margin-right:.4rem"></span>${esc(e.curto)}</td>${M.map(t => {
+    const fc = t.cnpj === foco ? 'g-focus' : '';
+    if (t.cnpj === e.cnpj) return `<td class="g-self ${fc}" title="Mesma empresa"></td>`;
+    const g = cell.get(gKey(e.cnpj, t.cnpj));
+    return g ? `<td class="${fc}" style="background:${alpha(th.brand, 0.1 + 0.38 * (mmax ? g.vc / mmax : 0))}" title="${esc(e.curto + ' → ' + t.curto)}: ${NUM.format(g.n)} NFS-e">${money(g.vc)}</td>` : `<td class="g-zero ${fc}">—</td>`;
+  }).join('')}<td class="font-medium">${rowTot.has(e.cnpj) ? money(rowTot.get(e.cnpj).vc) : '—'}</td></tr>`).join('');
+  const mxFoot = `<tr><td>Total recebido</td>${M.map(t => `<td class="${t.cnpj === foco ? 'g-focus' : ''}">${colTot.has(t.cnpj) ? money(colTot.get(t.cnpj).vc) : '—'}</td>`).join('')}<td>${money(tI.vc)}</td></tr>`;
+  const mxHtml = `<div class="card"><div class="card-h"><div><h3 class="t-title">Quem fatura para quem</h3><p class="t-sub">Linhas: emitentes presentes nos arquivos (${emitters.length} de ${M.length} empresas do Grupo). Colunas: tomadores. Valores em Vlr. Serviço; a coluna de ${esc(fn)} está destacada.</p></div></div>
+    <div class="card-b !px-0 !pb-0"><div class="scroll-x"><table class="tbl compact g-mx"><thead><tr><th>Emitente</th>${mxHead}<th>Total emitido</th></tr></thead><tbody>${mxBody}</tbody><tfoot>${mxFoot}</tfoot></table></div></div></div>`;
+
+  /* ---- fluxo por par ---- */
+  const pairs = groupBy(intra, n => gKey(n.emp, n.docD)).sort((a, b) => b.vc - a.vc);
+  const prRows = pairs.map(x => { const [e, t] = x.key.split('>'); return `<tr><td class="wrap font-medium">${esc(nm(e))} <span class="muted">→</span> ${esc(nm(t))}</td><td class="r">${NUM.format(x.n)}</td><td class="r">${money(x.vc)}</td><td class="r">${money(x.ic)}</td><td class="r">${pct(tI.vc ? x.vc / tI.vc : 0)}</td></tr>`; }).join('');
+  const prHtml = `<div class="card"><div class="card-h"><div><h3 class="t-title">Fluxo por par de empresas</h3><p class="t-sub">Somente pares com NFS-e no filtro atual.</p></div></div>
+    <div class="card-b !px-0 !pb-0"><div class="scroll-x">${pairs.length ? `<table class="tbl compact"><thead><tr><th>Emitente → Tomador</th><th class="r">NFS-e</th><th class="r">Faturamento</th><th class="r">ISSQN</th><th class="r">% do intragrupo</th></tr></thead><tbody>${prRows}</tbody>
+      <tfoot><tr><td>Total</td><td class="r">${NUM.format(tI.n)}</td><td class="r">${money(tI.vc)}</td><td class="r">${money(tI.ic)}</td><td class="r">${tI.vc ? '100,0%' : '—'}</td></tr></tfoot></table>` : '<p class="muted g-empty">Nenhuma NFS-e entre empresas do Grupo no filtro atual.</p>'}</div></div></div>`;
+
+  /* ---- tabela de NFS-e ---- */
+  const list = [...(F.tblAll ? intra : toFoco)].sort((a, b) => (b.date || '') < (a.date || '') ? -1 : (b.date || '') > (a.date || '') ? 1 : b.numInt - a.numInt), CAP = 1000, shown = list.slice(0, CAP), tL = summarize(list);
+  const tbRows = shown.map(n => `<tr data-action="row" data-k="${esc(n.key)}"><td>${esc(n.num)}</td><td>${fmtComp(n.ym)}</td><td>${fmtDate(n.date)}</td><td class="wrap"><div class="font-medium">${esc(nm(n.emp))}</div></td><td class="wrap"><div class="font-medium">${esc(nm(n.docD))}</div><div class="muted text-xs">${esc(fmtCnpj(n.docD))}</div></td><td>${esc(n.cat)}</td><td>${sitBadge(n.sit)}</td><td>${opBadge(n.ret)}</td><td class="r">${money(n.vc)}</td><td class="r">${money(n.ic)}</td><td><span class="mono muted" title="${esc(n.key)}">${esc(n.key.slice(0, 6))}…${esc(n.key.slice(-8))}</span></td></tr>`).join('');
+  const tbHtml = `<div class="card"><div class="card-h"><div><h3 class="t-title">NFS-e entre empresas do Grupo</h3><p class="t-sub">${NUM.format(list.length)} notas. Clique na linha para ver os detalhes.${list.length > CAP ? ` Mostrando as ${NUM.format(CAP)} mais recentes; o total considera todas.` : ''}</p></div>
+    <div class="seg no-print" role="group" aria-label="Notas exibidas"><button data-action="g-tbl" data-v="all" aria-pressed="${F.tblAll}">Todas do Grupo</button><button data-action="g-tbl" data-v="foco" aria-pressed="${!F.tblAll}">Só para ${esc(fn)}</button></div></div>
+    <div class="card-b !px-0 !pb-0"><div class="scroll-y scroll-x"><table class="tbl compact"><thead><tr><th>Nº NFS-e</th><th>Competência</th><th>Emissão</th><th>Emitente</th><th>Tomador</th><th>Tipo de serviço</th><th>Situação</th><th>Retenção ISSQN</th><th class="r">Vlr. Serviço</th><th class="r">ISSQN</th><th>Chave da Nota</th></tr></thead>
+      <tbody>${tbRows || '<tr><td colspan="11" class="muted" style="padding:2rem;text-align:center">Nenhuma NFS-e no filtro atual.</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="8">Total (${NUM.format(list.length)} NFS-e)</td><td class="r">${money(tL.vc)}</td><td class="r">${money(tL.ic)}</td><td></td></tr></tfoot></table></div></div></div>`;
+
+  /* ---- conferências do Grupo ---- */
+  const chk = []; const add = (s, t, d) => chk.push({ s, t, d });
+  const sumPairs = pairs.reduce((a, x) => a + x.vc, 0), sumPairsN = pairs.reduce((a, x) => a + x.n, 0);
+  const closeOk = tI.vc + tR.vc === tB.vc && tI.n + tR.n === tB.n && tI.ic + tR.ic === tB.ic;
+  add(closeOk ? 'ok' : 'err', 'Fechamento: intragrupo + terceiros = total do filtro', `Total ${money(tB.vc)} (${NUM.format(tB.n)} NFS-e) = intragrupo ${money(tI.vc)} (${NUM.format(tI.n)}) + terceiros ${money(tR.vc)} (${NUM.format(tR.n)}). ISSQN: ${money(tB.ic)} = ${money(tI.ic)} + ${money(tR.ic)}.`);
+  const mxOk = sumPairs === tI.vc && sumPairsN === tI.n && [...cell.values()].reduce((a, g) => a + g.vc, 0) === tI.vc;
+  add(mxOk ? 'ok' : 'err', 'Matriz e fluxo por par somam o intragrupo', `Soma dos pares ${money(sumPairs)} (${NUM.format(sumPairsN)} NFS-e) ${mxOk ? 'confere com' : 'difere de'} ${money(tI.vc)} (${NUM.format(tI.n)} NFS-e).`);
+  const sScope = summarize(scoped), rowsOk = [...cm.values()].every(o => o.fv + o.tv === o.vc && o.fn + o.tn === o.n);
+  const cmOk = rowsOk && cmT.vc === sScope.vc && cmT.n === sScope.n && cmT.fv + cmT.tv === cmT.vc;
+  add(cmOk ? 'ok' : 'err', 'Tabela por competência: Faturamento = Emitidos para ' + fn + ' + Terceiros', `Total ${money(cmT.vc)} (${NUM.format(cmT.n)} NFS-e) = ${money(cmT.fv)} + ${money(cmT.tv)}. ${cmOk ? 'Confere com a soma das notas dos emitentes considerados.' : 'Não confere com ' + money(sScope.vc) + '.'}`);
+  if (S.V.resumo && S.V.resumo.length) { const bad = S.V.resumo.filter(r => r.status !== 'ok'); add(bad.length ? 'err' : 'ok', 'Totais gerais do arquivo × aba Resumo', bad.length ? `${NUM.format(bad.length)} indicadores não conferem. Veja a aba Validação.` : 'NFS-e, faturamento, ISSQN e tomadores conferem com os totais de controle da aba Resumo (arquivo inteiro, sem filtros).'); }
+  if (missing.length) add('info', 'Empresas do cadastro sem NFS-e emitidas nos arquivos', `Só entram na matriz como tomadoras, se houver notas para elas. Empresas: ${missing.map(m => m.curto).join(', ')}`);
+  const noDoc = base.filter(n => !n.docD);
+  add(noDoc.length ? 'warn' : 'ok', 'NFS-e sem CPF/CNPJ do tomador', noDoc.length ? `${NUM.format(noDoc.length)} NFS-e (${money(summarize(noDoc).vc)}). Sem o documento não é possível saber se são intragrupo; ficam em terceiros.` : 'Todas as NFS-e do filtro têm documento do tomador.');
+  const roots = new Set(M.map(m => m.cnpj.slice(0, 8))), fil = base.filter(n => n.docD.length === 14 && !mset.has(n.docD) && roots.has(n.docD.slice(0, 8)));
+  add(fil.length ? 'warn' : 'ok', 'Tomadores com a raiz do CNPJ de uma empresa do Grupo (possíveis filiais)', fil.length ? `${NUM.format(fil.length)} NFS-e para CNPJs fora da lista: ${[...new Set(fil.map(n => fmtCnpj(n.docD)))].slice(0, 5).join(', ')}. Não entram no intragrupo; inclua o CNPJ no cadastro se forem do Grupo.` : 'Nenhum. O cruzamento por CNPJ completo cobre todos os casos.');
+  const rev = intra.filter(n => n.emp === foco);
+  if (rev.length) add('info', `NFS-e emitidas por ${fn} para outras empresas do Grupo`, `${NUM.format(rev.length)} NFS-e (${money(summarize(rev).vc)}): ${[...new Set(rev.map(n => esc(nm(n.docD))))].join(', ')}. Estão incluídas no intragrupo.`);
+  const self = base.filter(n => mset.has(n.emp) && n.emp === n.docD);
+  if (self.length) add('info', 'NFS-e em que emitente e tomador são a mesma empresa', `${NUM.format(self.length)} NFS-e (${money(summarize(self).vc)}). Não contam como intragrupo.`);
+  const outSit = X.period.filter(n => !F.sit.has(n.sit) && pair(n));
+  if (outSit.length) add('info', 'NFS-e intragrupo fora do filtro de Situação', `${[...groupBy(outSit, n => n.sit)].map(x => `${esc(x.key)}: ${NUM.format(x.n)} NFS-e (${money(x.vc)})`).join('; ')}.`);
+  const chkHtml = `<div class="card"><div class="card-h"><div><h3 class="t-title">Conferências do Grupo</h3><p class="t-sub">Valem para o filtro atual desta aba.</p></div></div><div class="card-b">${chk.map(c => `<div class="g-chk">${stIcon(c.s)}<div><b>${esc(c.t)}.</b> ${c.d}</div></div>`).join('')}</div></div>`;
+
+  el.innerHTML = `${filtersHtml}${banner}
+    <div><h2 class="t-title">Faturamento entre empresas do Grupo</h2><p class="t-sub">NFS-e em que o emitente e o tomador são empresas do Grupo, pelo CNPJ completo. ${esc(describeG().join('. '))}.</p></div>
+    ${kpis}
+    ${compHtml}
+    <div class="g-grid g-21"><div class="card"><div class="card-h"><div><h3 class="t-title">Emitido para ${esc(fn)} por competência</h3><p class="t-sub">Vlr. Serviço, por empresa emitente.</p></div></div><div class="card-b">${chartBox}</div></div>${rkHtml}</div>
+    ${mxHtml}
+    ${prHtml}
+    ${tbHtml}
+    ${chkHtml}`;
+
+  if (toFoco.length) {
+    const emps = rk.map(x => x.key), bm = new Map();
+    for (const n of toFoco) { const k = gKey(n.ym, n.emp); bm.set(k, (bm.get(k) || { vc: 0, n: 0 })); const o = bm.get(k); o.vc += n.vc; o.n++; }
+    const val = (m, e) => (bm.get(gKey(m, e)) || { vc: 0 }).vc;
+    drawChart('c-grupo', { type: 'bar',
+      data: { labels: monthsShown.map(fmtComp), datasets: emps.map(e => ({ label: nm(e), data: monthsShown.map(m => val(m, e) / 100), backgroundColor: colorOf(e), stack: 's', maxBarThickness: 36 })) },
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: S.printing ? 0 : 250 }, interaction: { mode: 'index', intersect: false },
+        scales: { x: { stacked: true, grid: { display: false }, ticks: { color: th.muted, maxRotation: 0 } }, y: { stacked: true, beginAtZero: true, border: { display: false }, grid: { color: th.grid }, ticks: { color: th.muted, callback: v => compact(v * 100) } } },
+        plugins: { legend: { display: emps.length > 1, position: 'bottom', labels: { color: th.ink, boxWidth: 10, boxHeight: 10 } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label}: ${BRL.format(c.parsed.y)}`, footer: items => { const m = monthsShown[items[0].dataIndex], tot = emps.reduce((a, e) => a + val(m, e), 0), nn = emps.reduce((a, e) => a + (bm.get(gKey(m, e)) || { n: 0 }).n, 0); return [`Total: ${money(tot)}`, `NFS-e: ${NUM.format(nn)}`]; } } } } } });
+  }
+}
+
+/* ---------- Tema ---------- */
+function setTheme(t) {
+  document.documentElement.classList.toggle('dark', t === 'dark');
+  try { localStorage.setItem('nfse-theme', t); } catch (e) {}
+  $('#btn-theme').innerHTML = ico(t === 'dark' ? 'sun' : 'moon', 'h-[18px] w-[18px]');
+  if (S.notes.length) renderActiveView();
+}
+
+/* ---------- Eventos ---------- */
+const closeMenus = () => { $('#export-menu').classList.add('hidden'); hideTomList(); };
+const H = {
+  upload() { $('#file').click(); },
+  theme() { setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark'); },
+  'export-menu'(el, e) { e.stopPropagation(); $('#export-menu').classList.toggle('hidden'); },
+  'export-xlsx'() { closeMenus(); exportXlsx(); },
+  'export-pdf'() { closeMenus(); exportPDF(); },
+  tab(el) { S.view = el.dataset.v; applyAdv(); showView(); renderActiveView(); window.scrollTo({ top: 0 }); },
+  'toggle-adv'() { S.advOpen = !advWanted(); applyAdv(); },
+  'clear-filters'() { S.F = defaultFilters(S.avail); $('#f-q').value = ''; onFilterChange(); },
+  chip(el) { const set = S.F[el.dataset.f], v = el.dataset.v; if (set.has(v)) set.delete(v); else set.add(v); onFilterChange(); },
+  'tom-add'(el) { S.F.tom.add(el.dataset.v); $('#f-tom').value = ''; hideTomList(); onFilterChange(); },
+  'tom-del'(el) { S.F.tom.delete(el.dataset.v); onFilterChange(); },
+  'rank-filter'(el) { const k = el.dataset.v; if (S.F.tom.has(k)) S.F.tom.delete(k); else S.F.tom.add(k); onFilterChange(); },
+  'tom-clear'() { S.F.tom.clear(); onFilterChange(); },
+  tax(el) { S.tax = el.dataset.v; renderEvolution(); },
+  fatmode(el) { S.fatMode = el.dataset.v; renderEvolution(); },
+  gran(el) { S.gran = el.dataset.v; renderOverview(); },
+  dim(el) { S.dim = el.dataset.v; renderDimCard(); },
+  'rank-tab'(el) { S.rankTab = el.dataset.v; renderRank(); },
+  page(el) { S.tbl.page = +el.dataset.p; renderTable(); $('#tbl-wrap').scrollTop = 0; },
+  sort(el) { const k = el.dataset.k; if (S.tbl.sort === k) S.tbl.dir = S.tbl.dir === 'asc' ? 'desc' : 'asc'; else { S.tbl.sort = k; S.tbl.dir = ['tom', 'sit', 'cat', 'ret', 'key'].includes(k) ? 'asc' : 'desc'; } S.tbl.page = 1; renderTable(); },
+  row(el) { openModal(el.dataset.k); },
+  'close-modal'(el, e) { if (e.target === el || e.target.closest('[data-close]')) closeModal(); },
+  copy(el) { copyText(el.dataset.v); },
+  'cmp-reset'() { S.cmp = cmpDefaults(); renderCompare(); },
+  'remove-source'(el) { S.sources = S.sources.filter(s => s.name !== el.dataset.v); S.view = 'overview'; refreshData(); },
+  'dismiss-err'(el) { S.errors.splice(+el.dataset.i, 1); renderAlerts(); renderEmptyErrors(); },
+  'g-sit'(el) { const set = S.G.sit, v = el.dataset.v; if (set.has(v)) set.delete(v); else set.add(v); renderGrupo(); },
+  'g-clear'() { S.G = gDefaults(); renderGrupo(); },
+  'g-tbl'(el) { S.G.tblAll = el.dataset.v === 'all'; renderGrupo(); },
+  'g-scope'(el) { S.G.scope = el.dataset.v; renderGrupo(); },
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!e.target.closest('#export-wrap')) $('#export-menu').classList.add('hidden');
+  if (!e.target.closest('#f-tom') && !e.target.closest('#tom-list')) hideTomList();
+  if (el && H[el.dataset.action]) H[el.dataset.action](el, e);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeMenus(); } });
+document.addEventListener('input', e => {
+  const id = e.target.id;
+  if (id === 'f-q') { clearTimeout(qTimer); qTimer = setTimeout(() => { S.F.q = e.target.value.trim(); S.F.qw = fold(e.target.value).split(/\s+/).filter(Boolean); onFilterChange(); }, 220); }
+  else if (id === 'f-tom') showTomList();
+  else if (id === 'f-min' || id === 'f-max') { clearTimeout(qTimer); qTimer = setTimeout(() => { const v = e.target.value === '' ? null : Math.max(0, Number(e.target.value)); S.F[id === 'f-min' ? 'min' : 'max'] = (v === null || isNaN(v)) ? null : v; onFilterChange(); }, 350); }
+});
+document.addEventListener('focusin', e => { if (e.target.id === 'f-tom') showTomList(); });
+document.addEventListener('change', e => {
+  const id = e.target.id, v = e.target.value;
+  if (id === 'emp-sel') { S.emp = v; S.view = S.view; applyScope(); }
+  else if (id === 'g-month') { S.G.month = v; renderGrupo(); }
+  else if (id === 'g-foco') { S.G.foco = v; renderGrupo(); }
+  else if (id === 'f-month') { S.F.month = v; onFilterChange(); }
+  else if (id === 'f-from') { S.F.from = v; onFilterChange(); }
+  else if (id === 'f-to') { S.F.to = v; onFilterChange(); }
+  else if (id === 't-size') { S.tbl.size = +v; S.tbl.page = 1; renderTable(); }
+  else if (id === 'rank-by') { S.rankBy = v; renderRank(); }
+  else if (id === 'file') { ingest(e.target.files).then(() => { e.target.value = ''; }); }
+  else if (id.startsWith('cmp-')) { const k = { 'cmp-af': 'aFrom', 'cmp-at': 'aTo', 'cmp-bf': 'bFrom', 'cmp-bt': 'bTo' }[id]; if (k) { S.cmp[k] = v; renderCompare(); } }
+});
+/* Arrastar e soltar */
+let dragN = 0;
+const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+window.addEventListener('dragenter', e => { if (!hasFiles(e)) return; dragN++; $('#drop').classList.add('over'); if (S.notes.length) $('#dropovl').classList.remove('hidden'); });
+window.addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if (!dragN) { $('#drop').classList.remove('over'); $('#dropovl').classList.add('hidden'); } });
+window.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+window.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); dragN = 0; $('#drop').classList.remove('over'); $('#dropovl').classList.add('hidden'); ingest(e.dataTransfer.files); });
+
+/* ---------- Início ---------- */
+$('#ic-up').innerHTML = ico('upload'); $('#ic-dl').innerHTML = ico('download'); $('#ic-xl').innerHTML = ico('sheet', 'h-5 w-5'); $('#ic-pr').innerHTML = ico('printer', 'h-5 w-5');
+$('#ic-drop').innerHTML = ico('upload', 'h-8 w-8');
+setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+</script>
+</body>
+</html>
