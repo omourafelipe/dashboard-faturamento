@@ -606,7 +606,7 @@ function rebuild(sources, empFilter = null) {
   const cnt = (fn) => { const m = new Map(); for (const n of notes) { const k = fn(n); const o = m.get(k) || { v: k, n: 0, vc: 0 }; o.n++; o.vc += n.vc; m.set(k, o); } return [...m.values()].sort((a, b) => b.vc - a.vc); };
   const dates = notes.map(n => n.date).filter(Boolean).sort();
   const avail = {
-    sit: cnt(n => n.sit), ret: cnt(n => n.ret), contr: cnt(n => n.contr).filter(x => x.v), cat: cnt(n => n.cat),
+    sit: cnt(n => n.sit), pessoa: cnt(n => n.tipo), ret: cnt(n => n.ret), contr: cnt(n => n.contr).filter(x => x.v), cat: cnt(n => n.cat),
     months: [...new Set(notes.map(n => n.ym).filter(Boolean))].sort(),
     minDate: dates[0] || '', maxDate: dates[dates.length - 1] || '',
     anyMonthOnly: notes.some(n => n.monthOnly), hasBase: notes.some(n => n.bc !== null), hasLiq: notes.some(n => n.liq !== null),
@@ -633,7 +633,7 @@ function companiesOf(sources) {
 function defaultFilters(avail) {
   return { q: '', qw: [], month: '', from: '', to: '',
     sit: new Set(avail.sit.filter(x => !isCancel(x.v)).map(x => x.v)),
-    ret: new Set(avail.ret.map(x => x.v)), contr: new Set(avail.contr.map(x => x.v)), cat: new Set(avail.cat.map(x => x.v)),
+    pessoa: new Set(avail.pessoa.map(x => x.v)), ret: new Set(avail.ret.map(x => x.v)), contr: new Set(avail.contr.map(x => x.v)), cat: new Set(avail.cat.map(x => x.v)),
     tom: new Set(), min: null, max: null };
 }
 function passes(n, F, o) {
@@ -647,6 +647,7 @@ function passes(n, F, o) {
   if (!F.ret.has(n.ret)) return false;
   if (n.contr && !F.contr.has(n.contr)) return false;   /* serviços fora de Plano de Saúde não têm contratação */
   if (!F.cat.has(n.cat)) return false;
+  if (!F.pessoa.has(n.tipo)) return false;
   if (!o.noTom && F.tom.size && !F.tom.has(n.tomKey)) return false;
   if (F.min !== null && n.vc < Math.round(F.min * 100)) return false;
   if (F.max !== null && n.vc > Math.round(F.max * 100)) return false;
@@ -893,7 +894,7 @@ const stIcon = s => `<span class="st ${s}">${ico(s === 'ok' ? 'check' : s === 'i
 const S = {
   sources: [], errors: [], notes: [], byKey: new Map(), tom: new Map(), tomList: [], avail: null, cross: null, meta: {}, V: null,
   F: null, filtered: [], sum: null, view: 'overview', tax: 'ic', gran: null, dim: 'cat', rankTab: 'tom', rankBy: 'vc', cmp: null,
-  tbl: { page: 1, size: 25, sort: 'date', dir: 'desc' }, printing: false, wasDark: false, advOpen: null, emp: null, companies: [], fatMode: null, rankBase: [], allNotes: [], byKeyAll: new Map(), G: null,
+  tbl: { page: 1, size: 25, sort: 'date', dir: 'desc' }, printing: false, wasDark: false, advOpen: null, emp: null, companies: [], fatMode: null, rankBase: [], allNotes: [], byKeyAll: new Map(), G: null, exGrupo: { rank: false, conc: false }, dupAll: false,
 };
 const charts = {};
 let toastTimer = null, qTimer = null;
@@ -994,11 +995,12 @@ function applyFilter() { S.filtered = S.notes.filter(n => passes(n, S.F)); S.ran
 function onFilterChange() { S.tbl.page = 1; applyFilter(); renderAlerts(); syncFilters(); renderActiveView(); }
 function activeCount() {
   const F = S.F, D = defaultFilters(S.avail), same = (a, b) => a.size === b.size && [...a].every(x => b.has(x));
-  return [F.q, F.month, F.from, F.to, F.min !== null, F.max !== null, F.tom.size, !same(F.sit, D.sit), !same(F.ret, D.ret), !same(F.contr, D.contr), !same(F.cat, D.cat)].filter(Boolean).length;
+  return [F.q, F.month, F.from, F.to, F.min !== null, F.max !== null, F.tom.size, !same(F.sit, D.sit), !same(F.pessoa, D.pessoa), !same(F.ret, D.ret), !same(F.contr, D.contr), !same(F.cat, D.cat)].filter(Boolean).length;
 }
 function describeFilters() {
   const F = S.F, a = S.avail, o = [];
   o.push('Situação: ' + (F.sit.size ? (a.sit.every(x => F.sit.has(x.v)) ? 'todas' : [...F.sit].join(', ')) : 'nenhuma'));
+  if (!a.pessoa.every(x => F.pessoa.has(x.v))) o.push('Tipo de tomador: ' + ([...F.pessoa].join(', ') || 'nenhum'));
   if (!a.ret.every(x => F.ret.has(x.v))) o.push('Retenção ISSQN: ' + ([...F.ret].join(', ') || 'nenhuma'));
   if (!a.contr.every(x => F.contr.has(x.v))) o.push('Tipo de contratação (Plano de Saúde): ' + ([...F.contr].join(', ') || 'nenhum'));
   if (!a.cat.every(x => F.cat.has(x.v))) o.push('Tipo de serviço: ' + ([...F.cat].join(', ') || 'nenhum'));
@@ -1016,6 +1018,7 @@ function renderFilters() {
   <div class="flex flex-wrap items-end gap-3 p-3 sm:p-4">
     <div class="w-full sm:w-44" data-dt><label class="lbl" for="f-month">Competência</label>
       <select id="f-month" class="inp"><option value="">Todas</option>${a.months.map(m => `<option value="${m}">${fmtComp(m)}</option>`).join('')}</select></div>
+    <div class="w-full sm:w-auto"><span class="lbl">Tipo de tomador</span><div class="flex flex-wrap gap-2">${a.pessoa.map(x => chipHtml('pessoa', x)).join('')}</div></div>
     <div class="relative min-w-[240px] flex-1 sm:max-w-md"><label class="lbl" for="f-tom">Tomador</label>
       <input id="f-tom" class="inp" type="search" autocomplete="off" placeholder="Digite o nome ou o CPF/CNPJ do tomador" aria-label="Buscar tomador">
       <div id="tom-list" class="menu hidden" style="left:0;right:0;max-height:300px;overflow:auto"></div></div>
@@ -1200,7 +1203,14 @@ function renderContrCard() {
     : `<p class="muted">${hasCat() ? 'Sem NFS-e de Plano de Saúde no filtro atual.' : 'Para identificar Plano de Saúde, carregue também a planilha Analítica (é nela que vem o Nome do Serviço).'}</p>`;
 }
 /* Ranking e gráfico de tomadores usam a base SEM o filtro de tomador: assim a lista completa continua visível e os selecionados ficam em destaque. */
-function tomGroups() { return groupBy(S.rankBase, n => n.tomKey).sort((a, b) => b[S.rankBy] - a[S.rankBy] || b.vc - a.vc); }
+/* Empresas do Grupo (cadastro + emitentes dos arquivos), pelo CNPJ completo. Usado para excluir tomadores do Grupo do Ranking e da Concentração. */
+function grupoTomKeys() {
+  const g = new Set(gMembers().map(m => m.cnpj)), out = new Set();
+  for (const [k, t] of S.tom) if (g.has(String(t.doc || '').replace(/\D/g, ''))) out.add(k);
+  return out;
+}
+const grupoSeg = (action, on, label) => `<div class="seg no-print" role="group" aria-label="${label}"><button data-action="${action}" data-v="0" aria-pressed="${!on}">Todos os tomadores</button><button data-action="${action}" data-v="1" aria-pressed="${on}" title="Remove os tomadores que são empresas do Grupo (CNPJ completo)">Sem empresas do Grupo</button></div>`;
+function tomGroups() { const gk = S.exGrupo.rank ? grupoTomKeys() : null; return groupBy(gk ? S.rankBase.filter(n => !gk.has(n.tomKey)) : S.rankBase, n => n.tomKey).sort((a, b) => b[S.rankBy] - a[S.rankBy] || b.vc - a.vc); }
 function renderTomChart() {
   const th = theme(), sel = S.F.tom, g0 = groupBy(S.rankBase, n => n.tomKey).sort((a, b) => b.vc - a.vc);
   const g = g0.slice(0, 10); g0.slice(10).forEach(x => { if (sel.has(x.key)) g.push(x); });
@@ -1241,6 +1251,7 @@ function renderCompare() {
 function renderRank() {
   const by = S.rankBy, sel = S.F.tom, seg = `<div class="seg no-print" role="group" aria-label="Tipo de ranking"><button data-action="rank-tab" data-v="tom" aria-pressed="${S.rankTab === 'tom'}">Tomadores</button><button data-action="rank-tab" data-v="nota" aria-pressed="${S.rankTab === 'nota'}">Maiores NFS-e</button></div>`;
   let body = '', sub = '';
+  const exG = S.exGrupo.rank, gk = exG ? grupoTomKeys() : null;
   if (S.rankTab === 'tom') {
     const g = tomGroups(), tot = g.reduce((a, x) => a + x[by], 0);
     if (!g.length) body = '<p class="muted p-4 text-sm">Sem dados no filtro atual.</p>';
@@ -1253,13 +1264,13 @@ function renderRank() {
       const foot = sel.size ? `<tfoot><tr><td></td><td>Soma dos ${NUM.format(ss.length)} selecionados</td><td class="r">${money(sv)}</td><td class="r">${money(si)}</td><td class="r">${NUM.format(sn)}</td><td class="r">${pct(tot ? sb / tot : 0)}</td><td></td></tr></tfoot>` : '';
       body = `<div class="scroll-x"><table class="tbl compact"><thead><tr><th></th><th>Tomador</th><th class="r">Faturamento</th><th class="r">ISSQN</th><th class="r">NFS-e</th><th class="r">% do total</th><th class="r">% acumulado</th></tr></thead><tbody>${rows}</tbody>${foot}</table></div>`;
     }
-    sub = `Top 15 de ${NUM.format(g.length)} tomadores, ordenado por ${by === 'vc' ? 'faturamento' : by === 'ic' ? 'ISSQN' : 'quantidade de notas'}. Clique nas linhas para marcar vários tomadores e compará-los; clique de novo para desmarcar.`;
+    sub = `Top 15 de ${NUM.format(g.length)} tomadores, ordenado por ${by === 'vc' ? 'faturamento' : by === 'ic' ? 'ISSQN' : 'quantidade de notas'}. Clique nas linhas para marcar vários tomadores e compará-los; clique de novo para desmarcar.` + (exG ? (() => { const e = summarize(S.rankBase.filter(n => gk.has(n.tomKey))); return ` Sem as empresas do Grupo: ${NUM.format(e.n)} NFS-e (${money(e.vc)}) ficaram de fora do ranking.`; })() : '');
   } else {
-    const l = [...S.filtered].sort((a, b) => b.vc - a.vc).slice(0, 15), tot = S.sum.vc;
+    const fl = exG ? S.filtered.filter(n => !gk.has(n.tomKey)) : S.filtered, l = [...fl].sort((a, b) => b.vc - a.vc).slice(0, 15), tot = exG ? summarize(fl).vc : S.sum.vc;
     body = l.length ? `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>#</th><th>Nº NFS-e</th><th>Tomador</th><th>Data</th><th class="r">Vlr. Serviço</th><th class="r">% do total</th></tr></thead><tbody>${l.map((n, i) => `<tr data-action="row" data-k="${esc(n.key)}"><td class="muted">${i + 1}</td><td>${esc(n.num)}</td><td class="wrap">${esc(n.tom)}</td><td>${fmtDate(n.date)}</td><td class="r">${money(n.vc)}</td><td class="r">${pct(tot ? n.vc / tot : 0)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted p-4 text-sm">Sem dados no filtro atual.</p>';
-    sub = 'As 15 maiores notas pelo Vlr. Serviço. Clique para ver os detalhes.';
+    sub = 'As 15 maiores notas pelo Vlr. Serviço. Clique para ver os detalhes.' + (exG ? (() => { const e = summarize(S.filtered.filter(n => gk.has(n.tomKey))); return ` Sem as empresas do Grupo: ${NUM.format(e.n)} NFS-e (${money(e.vc)}) ficaram de fora.`; })() : '');
   }
-  $('#rank').innerHTML = `<div class="card-h"><div class="min-w-0 max-w-3xl"><h3 class="t-title">Ranking</h3><p class="t-sub">${sub}</p></div><div class="flex flex-wrap items-center gap-2">${sel.size && S.rankTab === 'tom' ? `<button class="btn btn-sm no-print" data-action="tom-clear">${ico('x', 'h-3.5 w-3.5')}Limpar seleção (${NUM.format(sel.size)})</button>` : ''}${S.rankTab === 'tom' ? `<select id="rank-by" class="inp no-print !w-auto" aria-label="Ordenar por"><option value="vc"${by === 'vc' ? ' selected' : ''}>Faturamento</option><option value="ic"${by === 'ic' ? ' selected' : ''}>ISSQN</option><option value="n"${by === 'n' ? ' selected' : ''}>Nº de NFS-e</option></select>` : ''}${seg}</div></div><div class="card-b !px-0 !pb-1">${body}</div>`;
+  $('#rank').innerHTML = `<div class="card-h"><div class="min-w-0 max-w-3xl"><h3 class="t-title">Ranking</h3><p class="t-sub">${sub}</p></div><div class="flex flex-wrap items-center gap-2">${sel.size && S.rankTab === 'tom' ? `<button class="btn btn-sm no-print" data-action="tom-clear">${ico('x', 'h-3.5 w-3.5')}Limpar seleção (${NUM.format(sel.size)})</button>` : ''}${S.rankTab === 'tom' ? `<select id="rank-by" class="inp no-print !w-auto" aria-label="Ordenar por"><option value="vc"${by === 'vc' ? ' selected' : ''}>Faturamento</option><option value="ic"${by === 'ic' ? ' selected' : ''}>ISSQN</option><option value="n"${by === 'n' ? ' selected' : ''}>Nº de NFS-e</option></select>` : ''}${grupoSeg('rank-grupo', exG, 'Tomadores considerados no ranking')}${seg}</div></div><div class="card-b !px-0 !pb-1">${body}</div>`;
 }
 function renderTaxKPIs() {
   const t = S.sum, list = TAXES.slice(1).filter(x => S.avail.tax[x.k]), el = $('#kpis-tax');
@@ -1513,7 +1524,7 @@ function describeG() {
   const F = S.G, o = [], all = [...new Set(S.allNotes.map(n => n.sit))];
   o.push('Situação: ' + (all.every(x => F.sit.has(x)) ? 'todas' : ([...F.sit].join(', ') || 'nenhuma')));
   if (F.month) o.push('Competência: ' + fmtComp(F.month));
-  const f = gMembers().find(m => m.cnpj === F.foco); if (f) { o.push('Tomador em foco: ' + f.curto); o.push('Faturamento por competência: ' + (F.scope === 'todas' ? 'todas as empresas emitentes' : 'emitentes exceto ' + f.curto)); }
+  const f = gMembers().find(m => m.cnpj === F.foco); if (f) { o.push('Tomador em foco: ' + f.curto); o.push('Faturamento por competência: ' + (F.scope === 'todas' ? 'todas as empresas emitentes' : F.scope === 'prest' ? 'emitentes exceto ' + f.curto : 'emitente ' + ((gMembers().find(m => m.cnpj === F.scope) || {}).curto || fmtCnpj(F.scope)))); }
   return o;
 }
 
@@ -1554,7 +1565,8 @@ function renderGrupo() {
 
   /* ---- faturamento por competência: total x emitido para o foco x terceiros ---- */
   const monthsShown = F.month ? [F.month] : months;
-  const scoped = base.filter(n => mset.has(n.emp) && (F.scope === 'todas' || n.emp !== foco));
+  const scopeV = (F.scope === 'prest' || F.scope === 'todas' || emitters.some(m => m.cnpj === F.scope)) ? F.scope : 'prest';   /* 'prest' = exceto o tomador em foco; 'todas'; ou o CNPJ de um emitente */
+  const scoped = base.filter(n => mset.has(n.emp) && (scopeV === 'todas' ? true : scopeV === 'prest' ? n.emp !== foco : n.emp === scopeV));
   const cm = new Map();
   for (const n of scoped) {
     const k = n.ym || ''; let o = cm.get(k); if (!o) cm.set(k, o = { vc: 0, n: 0, fv: 0, fn: 0, tv: 0, tn: 0, og: 0, ogn: 0 });
@@ -1568,9 +1580,9 @@ function renderGrupo() {
   const cmRows = cmKeys.map(k => { const o = cm.get(k) || { vc: 0, n: 0, fv: 0, fn: 0, tv: 0, tn: 0 };
     return `<tr><td class="font-medium">${k ? fmtComp(k) : 'Sem competência'}</td><td>${cn(o.vc, o.n)}</td><td class="g-focus">${cn(o.fv, o.fn)}</td><td>${cn(o.tv, o.tn)}</td><td>${o.vc ? pct(o.fv / o.vc) : '—'}</td></tr>`; }).join('');
   const compHtml = `<div class="card"><div class="card-h"><div><h3 class="t-title">Faturamento por competência</h3><p class="t-sub">${cmEmps.length ? 'Emitentes: ' + esc(cmEmps.map(nm).join(', ')) + '. ' : ''}Vlr. Serviço. Terceiros é tudo o que não foi emitido para ${esc(fn)}.</p></div>
-    <div class="seg no-print" role="group" aria-label="Emitentes considerados"><button data-action="g-scope" data-v="prest" aria-pressed="${F.scope !== 'todas'}">Exceto ${esc(fn)}</button><button data-action="g-scope" data-v="todas" aria-pressed="${F.scope === 'todas'}">Todas as empresas</button></div></div>
+    <div class="g-f no-print"><label class="lbl" for="g-scope-sel">Empresa emitente</label><select id="g-scope-sel" class="inp !w-auto"><option value="prest"${scopeV === 'prest' ? ' selected' : ''}>Todas, exceto ${esc(fn)}</option><option value="todas"${scopeV === 'todas' ? ' selected' : ''}>Todas as empresas</option>${emitters.map(m => `<option value="${esc(m.cnpj)}"${scopeV === m.cnpj ? ' selected' : ''}>${esc(m.curto)}</option>`).join('')}</select></div></div>
     <div class="card-b !px-0 !pb-0"><div class="scroll-x">${cm.size ? `<table class="tbl compact g-mx"><thead><tr><th>Competência</th><th>Faturamento</th><th class="g-focus">Emitidos para ${esc(fn)}</th><th>Emitidos para Terceiros</th><th>% para ${esc(fn)}</th></tr></thead><tbody>${cmRows}</tbody>
-      <tfoot><tr><td>Total</td><td>${money(cmT.vc)}</td><td class="g-focus">${money(cmT.fv)}</td><td>${money(cmT.tv)}</td><td>${cmT.vc ? pct(cmT.fv / cmT.vc) : '—'}</td></tr></tfoot></table>` : `<p class="muted g-empty">Nenhuma NFS-e emitida ${F.scope === 'todas' ? '' : 'por outras empresas '}no filtro atual.</p>`}</div>
+      <tfoot><tr><td>Total</td><td>${money(cmT.vc)}</td><td class="g-focus">${money(cmT.fv)}</td><td>${money(cmT.tv)}</td><td>${cmT.vc ? pct(cmT.fv / cmT.vc) : '—'}</td></tr></tfoot></table>` : `<p class="muted g-empty">${scopeV === 'todas' ? 'Nenhuma NFS-e emitida' : scopeV === 'prest' ? 'Nenhuma NFS-e emitida por outras empresas' : 'Nenhuma NFS-e emitida por ' + esc(nm(scopeV))} no filtro atual.</p>`}</div>
       ${cmT.og ? `<p class="muted text-xs" style="padding:10px 16px 14px">Dentro de Terceiros, ${money(cmT.og)} (${NUM.format(cmT.ogn)} NFS-e) são para outras empresas do Grupo.</p>` : ''}</div></div>`;
 
   /* ---- gráfico por competência e ranking de emitentes ---- */
@@ -1924,10 +1936,12 @@ function dSecCart(D, X) {
   const concCell = (c, N) => { const v = c.sh[N]; return v === null ? '<span class="muted">—</span>' : (c.n <= N ? `<span class="muted" title="Todos os ${NUM.format(c.n)} tomadores ativos">${pct(v)}</span>` : pct(v)); };
   const concRow = (lab, c, cls) => `<tr class="${cls || ''}"><td class="font-medium">${lab}</td><td class="r">${NUM.format(c.n)}</td><td class="wrap" title="${c.top ? dTom(c.top.key) : ''}">${c.top ? `${esc(trunc((S.tom.get(c.top.key) || {}).label || c.top.key, 34))} <span class="muted">${c.tot > 0 ? pct(c.top.vc / c.tot) : ''}</span>` : '<span class="muted">—</span>'}</td>${DIAG.topN.map(N => `<td class="r">${concCell(c, N)}</td>`).join('')}</tr>`;
   const tmAll = new Map(); for (const m of D.months) for (const [k, t] of D.tomM.get(m)) { let a = tmAll.get(k); if (!a) tmAll.set(k, a = { vc: 0, n: 0 }); a.vc += t.vc; a.n += t.n; }
-  const concBody = concRow(`Todas as competências <span class="muted">(${NUM.format(D.months.length)})</span>`, dConc(tmAll)) + [...D.months].reverse().map(m => concRow(fmtComp(m), dConc(rows.get(m).tm), m === ref ? 'dg-hl' : '')).join('');
-  const concCard = dCard('Concentração por tomador', 'Participação dos maiores tomadores no faturamento da competência.',
+  const exC = S.exGrupo.conc, gkC = exC ? grupoTomKeys() : null, sx = tm => gkC ? new Map([...tm].filter(([k]) => !gkC.has(k))) : tm;
+  let exVc = 0, exN = 0; if (gkC) for (const m of D.months) for (const [k, t] of D.tomM.get(m)) if (gkC.has(k)) { exVc += t.vc; exN += t.n; }
+  const concBody = concRow(`Todas as competências <span class="muted">(${NUM.format(D.months.length)})</span>`, dConc(sx(tmAll))) + [...D.months].reverse().map(m => concRow(fmtComp(m), dConc(sx(rows.get(m).tm)), m === ref ? 'dg-hl' : '')).join('');
+  const concCard = dCard('Concentração por tomador', exC ? 'Participação dos maiores tomadores no faturamento da competência, sem as empresas do Grupo.' : 'Participação dos maiores tomadores no faturamento da competência.',
     `<div class="scroll-y scroll-x" style="max-height:460px"><table class="tbl compact"><thead><tr><th>Competência</th><th class="r">Tomadores ativos</th><th>Maior tomador</th>${DIAG.topN.map(N => `<th class="r">Top ${N}</th>`).join('')}</tr></thead><tbody>${concBody}</tbody></table></div>
-    <p class="dg-note">Top N = soma dos N maiores tomadores ÷ faturamento da competência. Percentuais em cinza indicam que o Top N já inclui todos os tomadores ativos.</p>`);
+    <p class="dg-note">Top N = soma dos N maiores tomadores ÷ faturamento da competência${exC ? ' (sem as empresas do Grupo)' : ''}. Percentuais em cinza indicam que o Top N já inclui todos os tomadores ativos.${exC ? ` Fora do cálculo: ${money(exVc)} em ${NUM.format(exN)} NFS-e emitidas para empresas do Grupo (CNPJ completo), em todas as competências.` : ''}</p>`, grupoSeg('conc-grupo', exC, 'Tomadores considerados na concentração'));
   return { html: `<div><h2 class="t-title">Carteira de tomadores</h2><p class="t-sub">Tomador = CPF/CNPJ (ou o nome, se não houver documento). Respeita os filtros atuais, menos as datas.</p></div>${flowCard}${concCard}`, draw: null };
 }
 
@@ -2030,8 +2044,8 @@ function dSecAlert(D, X) {
   const nRows = A.num.filter(x => x.miss).map(x => `<tr><td class="wrap font-medium">${esc(x.nome)}</td><td class="r">${NUM.format(x.min)} a ${NUM.format(x.max)}</td><td class="r">${NUM.format(x.n)}</td><td class="r">${NUM.format(x.miss)}</td><td class="wrap muted">${esc(x.ranges.slice(0, 6).join('; '))}${x.ranges.length > 6 ? ` e mais ${NUM.format(x.ranges.length - 6)} trechos` : ''}</td></tr>`).join('');
   const numC = nRows ? dCard('Lacunas na numeração', 'Por emitente, em todos os arquivos carregados e todas as situações.', `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Emitente</th><th class="r">Menor a maior Nº</th><th class="r">Números presentes</th><th class="r">Ausentes</th><th>Trechos ausentes</th></tr></thead><tbody>${nRows}</tbody></table></div><p class="dg-note">Só entram números formados apenas por dígitos. Se a prefeitura reiniciar a numeração por ano ou série, as lacunas serão artificiais.</p>`) : '';
   /* duplicidades */
-  const dRows = A.du.slice(0, 10).map(g => `<tr data-action="row" data-k="${esc(g[0].key)}"><td>${fmtDate(g[0].date)}</td><td class="wrap font-medium">${esc(trunc(g[0].tom, 44))}</td><td class="r">${money(g[0].vc)}</td><td class="r">${NUM.format(g.length)}</td><td class="wrap muted">${esc(g.map(n => n.num).join(', '))}</td></tr>`).join('');
-  const dupC = A.du.length ? dCard('Possíveis duplicidades por conteúdo', 'Mesmo emitente, tomador, data de emissão e valor. Clique na linha para abrir a primeira nota do grupo.', `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Emissão</th><th>Tomador</th><th class="r">Vlr. Serviço</th><th class="r">NFS-e</th><th>Nºs</th></tr></thead><tbody>${dRows}</tbody></table></div>${A.du.length > 10 ? `<p class="dg-note">Mostrando 10 de ${NUM.format(A.du.length)} grupos, os de maior valor.</p>` : ''}`) : '';
+  const dShown = S.dupAll ? A.du : A.du.slice(0, 10), dRows = dShown.map(g => `<tr data-action="row" data-k="${esc(g[0].key)}"><td>${fmtDate(g[0].date)}</td><td class="wrap font-medium">${esc(trunc(g[0].tom, 44))}</td><td class="r">${money(g[0].vc)}</td><td class="r">${NUM.format(g.length)}</td><td class="wrap muted">${esc(g.map(n => n.num).join(', '))}</td></tr>`).join('');
+  const dupC = A.du.length ? dCard('Possíveis duplicidades por conteúdo', 'Mesmo emitente, tomador, data de emissão e valor. Clique na linha para abrir a primeira nota do grupo.', `<div class="${S.dupAll ? 'scroll-y ' : ''}scroll-x"${S.dupAll ? ' style="max-height:520px"' : ''}><table class="tbl compact"><thead><tr><th>Emissão</th><th>Tomador</th><th class="r">Vlr. Serviço</th><th class="r">NFS-e</th><th>Nºs</th></tr></thead><tbody>${dRows}</tbody></table></div>${A.du.length > 10 ? `<p class="dg-note">${S.dupAll ? `Mostrando todos os ${NUM.format(A.du.length)} grupos, do maior para o menor valor.` : `Mostrando 10 de ${NUM.format(A.du.length)} grupos, os de maior valor.`}</p>` : ''}`, A.du.length > 10 ? `<button class="btn btn-sm no-print" data-action="dup-toggle" aria-expanded="${S.dupAll}">${S.dupAll ? 'Mostrar só os 10 maiores' : `Ver todas (${NUM.format(A.du.length)})`}</button>` : '') : '';
   return { html: `${head}${summary}${cancel}${atip}${numC}${dupC}`, draw: null };
 }
 
@@ -2083,7 +2097,7 @@ function renderDiag() {
     <div class="g-f grow"><span class="lbl">Seção</span><div class="dg-nav"><div class="seg" role="group" aria-label="Seção do diagnóstico">${DSEC.map(([k, l]) => `<button data-action="d-sec" data-v="${k}" aria-pressed="${st.sec === k}">${l}${k === 'conf' ? ` <span class="badge ${bad ? 'b-neg' : 'b-pos'}" style="margin-left:.25rem">${bad ? bad + ' com erro' : good + ' ok'}</span>` : ''}</button>`).join('')}</div></div></div>
   </div></section>`;
   const notes = [];
-  if (S.F.month || S.F.from || S.F.to) notes.push(`<div class="alert al-info no-print"><span class="ai">${ico('info')}</span><div>Os filtros de data da Visão geral não valem aqui. O Diagnóstico usa todas as competências carregadas e escolhe a de referência acima. Situação, retenção, tipo de serviço, tomador, valor e busca continuam valendo.</div></div>`);
+  if (S.F.month || S.F.from || S.F.to) notes.push(`<div class="alert al-info no-print"><span class="ai">${ico('info')}</span><div>Os filtros de data da Visão geral não valem aqui. O Diagnóstico usa todas as competências carregadas e escolhe a de referência acima. Situação, tipo de tomador (PJ/PF), retenção, tipo de serviço, tomador, valor e busca continuam valendo.</div></div>`);
   if (D.inc && st.sec !== 'alert' && st.sec !== 'conf') notes.push(`<div class="alert al-warn"><span class="ai">${ico('alert')}</span><div class="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1"><span><b class="font-medium">${fmtComp(D.inc.ym)} possivelmente incompleta:</b> ${esc(D.inc.why)}. ${X.ref === D.inc.ym ? 'As variações abaixo comparam um período parcial.' : 'Ela entra nas tabelas, mas fica fora da média, do melhor e do pior mês.'}</span>${X.ref === D.inc.ym && D.months.length > 1 ? `<button class="btn btn-sm no-print" data-action="d-prev">Usar ${fmtComp(dPrevYm(D.inc.ym))}</button>` : ''}</div></div>`);
   if (bad) notes.push(`<div class="alert al-err"><span class="ai">${ico('alert')}</span><div class="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1"><span><b class="font-medium">${bad} ${bad === 1 ? 'conferência não fecha' : 'conferências não fecham'}.</b> Os números desta aba não devem ser usados até resolver.</span><button class="btn btn-sm no-print" data-action="d-sec" data-v="conf">Ver conferências</button></div></div>`);
   el.innerHTML = bar + notes.join('') + body.html;
@@ -2119,6 +2133,9 @@ const H = {
   gran(el) { S.gran = el.dataset.v; renderOverview(); },
   dim(el) { S.dim = el.dataset.v; renderDimCard(); },
   'rank-tab'(el) { S.rankTab = el.dataset.v; renderRank(); },
+  'rank-grupo'(el) { S.exGrupo.rank = el.dataset.v === '1'; renderRank(); },
+  'conc-grupo'(el) { S.exGrupo.conc = el.dataset.v === '1'; renderDiag(); },
+  'dup-toggle'() { S.dupAll = !S.dupAll; renderDiag(); },
   page(el) { S.tbl.page = +el.dataset.p; renderTable(); $('#tbl-wrap').scrollTop = 0; },
   sort(el) { const k = el.dataset.k; if (S.tbl.sort === k) S.tbl.dir = S.tbl.dir === 'asc' ? 'desc' : 'asc'; else { S.tbl.sort = k; S.tbl.dir = ['tom', 'sit', 'cat', 'ret', 'key'].includes(k) ? 'asc' : 'desc'; } S.tbl.page = 1; renderTable(); },
   row(el) { openModal(el.dataset.k); },
@@ -2130,7 +2147,6 @@ const H = {
   'g-sit'(el) { const set = S.G.sit, v = el.dataset.v; if (set.has(v)) set.delete(v); else set.add(v); renderGrupo(); },
   'g-clear'() { S.G = gDefaults(); renderGrupo(); },
   'g-tbl'(el) { S.G.tblAll = el.dataset.v === 'all'; renderGrupo(); },
-  'g-scope'(el) { S.G.scope = el.dataset.v; renderGrupo(); },
   'd-sec'(el) { S.D.sec = el.dataset.v; renderDiag(); },
   'd-cmp'(el) { S.D.cmp = el.dataset.v; renderDiag(); },
   'd-prev'() { S.D.ref = dPrevYm(S.D.ref); renderDiag(); },
@@ -2154,6 +2170,7 @@ document.addEventListener('change', e => {
   if (id === 'emp-sel') { S.emp = v; S.view = S.view; applyScope(); }
   else if (id === 'g-month') { S.G.month = v; renderGrupo(); }
   else if (id === 'g-foco') { S.G.foco = v; renderGrupo(); }
+  else if (id === 'g-scope-sel') { S.G.scope = v; renderGrupo(); }
   else if (id === 'd-ref') { S.D.ref = v; renderDiag(); }
   else if (id === 'f-month') { S.F.month = v; onFilterChange(); }
   else if (id === 'f-from') { S.F.from = v; onFilterChange(); }
