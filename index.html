@@ -222,6 +222,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .g-mx th:first-child,.g-mx td:first-child{text-align:left}
   .g-mx td.g-focus,.g-mx th.g-focus{box-shadow:inset 2px 0 0 var(--brand),inset -2px 0 0 var(--brand)}
   .g-mx th.g-focus{background:var(--brand-soft);color:var(--brand)}
+  .g-cm-wrap{max-height:min(70vh,560px);overflow:auto}
+  .g-cm td,.g-cm th{padding:.3rem .65rem}
+  .g-cm td .g-n{margin-left:.4rem}
   .g-mx td.g-zero{color:var(--muted)}
   .g-mx td.g-self{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--line) 5px 6px)}
   .g-chk{display:flex;gap:.65rem;align-items:flex-start;padding:.6rem 0;border-bottom:1px solid var(--line);font-size:.8125rem;line-height:1.45}
@@ -1768,15 +1771,15 @@ function renderGrupo() {
     o.vc += n.vc; o.n++;
     if (n.docD === foco) { o.fv += n.vc; o.fn++; } else { o.tv += n.vc; o.tn++; if (mset.has(n.docD) && n.docD !== n.emp) { o.og += n.vc; o.ogn++; } }
   }
-  const cmKeys = [...monthsShown, ...(cm.has('') ? [''] : [])];
+  const cmKeys = [...monthsShown].sort().reverse().concat(cm.has('') ? [''] : []);   /* mais recente primeiro */
   const cmT = [...cm.values()].reduce((a, o) => { for (const k in a) a[k] += o[k]; return a; }, { vc: 0, n: 0, fv: 0, fn: 0, tv: 0, tn: 0, og: 0, ogn: 0 });
   const cmEmps = [...new Set(scoped.map(n => n.emp))].sort((a, b) => M.findIndex(m => m.cnpj === a) - M.findIndex(m => m.cnpj === b));
-  const cn = (v, n) => v ? `${money(v)}<div class="muted text-xs">${NUM.format(n)} NFS-e</div>` : '<span class="muted">—</span>';
+  const cn = (v, n) => v ? `${money(v)} <span class="muted text-xs g-n">${NUM.format(n)} NFS-e</span>` : '<span class="muted">—</span>';
   const cmRows = cmKeys.map(k => { const o = cm.get(k) || { vc: 0, n: 0, fv: 0, fn: 0, tv: 0, tn: 0 };
     return `<tr><td class="font-medium">${k ? fmtComp(k) : 'Sem competência'}</td><td>${cn(o.vc, o.n)}</td><td class="g-focus">${cn(o.fv, o.fn)}</td><td>${cn(o.tv, o.tn)}</td><td>${o.vc ? pct(o.fv / o.vc) : '—'}</td></tr>`; }).join('');
   const compHtml = `<div class="card"><div class="card-h"><div><h3 class="t-title">Faturamento por competência</h3><p class="t-sub">${cmEmps.length ? 'Emitentes: ' + esc(cmEmps.map(nm).join(', ')) + '. ' : ''}Vlr. Serviço. Terceiros é tudo o que não foi emitido para ${esc(fn)}.</p></div>
     <div class="g-f no-print"><label class="lbl" for="g-scope-sel">Empresa emitente</label><select id="g-scope-sel" class="inp !w-auto"><option value="prest"${scopeV === 'prest' ? ' selected' : ''}>Todas, exceto ${esc(fn)}</option><option value="todas"${scopeV === 'todas' ? ' selected' : ''}>Todas as empresas</option>${emitters.map(m => `<option value="${esc(m.cnpj)}"${scopeV === m.cnpj ? ' selected' : ''}>${esc(m.curto)}</option>`).join('')}</select></div></div>
-    <div class="card-b !px-0 !pb-0"><div class="scroll-x">${cm.size ? `<table class="tbl compact g-mx"><thead><tr><th>Competência</th><th>Faturamento</th><th class="g-focus">Emitidos para ${esc(fn)}</th><th>Emitidos para Terceiros</th><th>% para ${esc(fn)}</th></tr></thead><tbody>${cmRows}</tbody>
+    <div class="card-b !px-0 !pb-0"><div class="scroll-x g-cm-wrap">${cm.size ? `<table class="tbl compact g-mx g-cm"><thead><tr><th>Competência</th><th>Faturamento</th><th class="g-focus">Emitidos para ${esc(fn)}</th><th>Emitidos para Terceiros</th><th>% para ${esc(fn)}</th></tr></thead><tbody>${cmRows}</tbody>
       <tfoot><tr><td>Total</td><td>${money(cmT.vc)}</td><td class="g-focus">${money(cmT.fv)}</td><td>${money(cmT.tv)}</td><td>${cmT.vc ? pct(cmT.fv / cmT.vc) : '—'}</td></tr></tfoot></table>` : `<p class="muted g-empty">${scopeV === 'todas' ? 'Nenhuma NFS-e emitida' : scopeV === 'prest' ? 'Nenhuma NFS-e emitida por outras empresas' : 'Nenhuma NFS-e emitida por ' + esc(nm(scopeV))} no filtro atual.</p>`}</div>
       ${cmT.og ? `<p class="muted text-xs" style="padding:10px 16px 14px">Dentro de Terceiros, ${money(cmT.og)} (${NUM.format(cmT.ogn)} NFS-e) são para outras empresas do Grupo.</p>` : ''}</div></div>`;
 
