@@ -229,6 +229,8 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   .g-chk b{font-weight:500}
   /* ---- Aba Diagnóstico ---- */
   #view-diag>*{min-width:0}
+  #view-exec>*{min-width:0}
+  @media print{#view-exec .x-pb{break-before:page} #view-exec .kpis.kn>.kpi:last-child:nth-child(odd){grid-column:auto!important} #view-exec .g-chk{padding:.3rem 0!important} #view-exec .dg-2{grid-template-columns:minmax(0,1fr)!important} #c-exec-evo,#c-exec-rec{max-height:230px!important;width:auto!important}}
   .dg-bar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 20px;padding:14px 16px}
   .dg-bar .g-f{min-width:170px}
   .dg-nav{overflow-x:auto;max-width:100%;padding-bottom:2px}
@@ -329,7 +331,6 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 
   <div id="workspace" class="hidden space-y-4">
     <div id="print-head" class="print-only"></div>
-    <div id="adv-nav" class="hidden no-print"></div>
     <div id="emp-bar" class="hidden no-print"></div>
     <div id="alerts" class="space-y-2 no-print"></div>
     <section id="filters" class="card no-print"></section>
@@ -385,6 +386,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
     <div id="view-validation" class="hidden space-y-4"></div>
     <div id="view-grupo" class="hidden space-y-4"></div>
     <div id="view-diag" class="hidden space-y-4"></div>
+    <div id="view-exec" class="hidden space-y-4"></div>
   </div>
 </main>
 
@@ -947,6 +949,7 @@ function compact(c) {
   return s + 'R$ ' + f(v, 0);
 }
 const ICON = {
+  layout: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>',
   upload: '<path d="M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/>',
   download: '<path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -1034,7 +1037,7 @@ function refreshData() {
   $('#export-wrap').classList.toggle('hidden', empty);
   renderEmptyErrors();
   if (empty) { S.notes = []; $('#hdr-sub').textContent = 'Carregue uma planilha para começar'; return; }
-  S.companies = companiesOf(S.sources); S.G = null;
+  S.companies = companiesOf(S.sources); S.G = null; S.X = null;
   if (S.emp !== '__all__' && !S.companies.some(c => c.emp === S.emp)) S.emp = S.companies.length > 1 ? '__all__' : S.companies[0].emp;   /* várias empresas: abre no consolidado */
   applyScope();
 }
@@ -1157,7 +1160,6 @@ function showTomList() {
   box.classList.remove('hidden');
 }
 const hideTomList = () => { const b = $('#tom-list'); if (b) b.classList.add('hidden'); };
-function renderAdvNav() { const an = $('#adv-nav'); if (an) an.classList.add('hidden'); }   /* sem submenu: Diagnóstico e Grupo são abas do topo */
 /* Resumo fixo dos filtros: aparece sob o cabeçalho quando a barra de filtros sai da tela. */
 function filterParts() {
   const D = defaultFilters(S.avail); let p = describeFilters();
@@ -1180,18 +1182,19 @@ function renderHeader() {
   if (isConsolidated()) txt = 'Todas as empresas (consolidado)';
   else if (c) txt = (c.name && c.name !== c.cnpj) ? `${c.name}, CNPJ ${c.cnpj}` : `CNPJ ${c.cnpj}`;
   if (S.view === 'grupo') txt = 'Empresas do Grupo (todos os emitentes dos arquivos)';
+  if (S.view === 'exec') txt = 'Central Executiva (todas as empresas emitentes)';
   $('#hdr-sub').textContent = txt; $('#hdr-sub').title = txt;
   const bad = S.V.quality.some(q => q.alert) || S.V.recon.some(r => r.status === 'err');
-  const tabs = [['overview', 'chart', 'Visão geral'], ['table', 'table', `NFS-e (${NUM.format(S.filtered.length)})`], ['validation', 'shield', 'Validação'], ['diag', 'pulse', 'Diagnóstico'], ['grupo', 'group', 'Grupo']];
+  const tabs = [['overview', 'chart', 'Visão geral'], ['grupo', 'group', 'Grupo'], ['diag', 'pulse', 'Diagnóstico'], ['table', 'table', `NFS-e (${NUM.format(S.filtered.length)})`], ['exec', 'layout', 'Central'], ['validation', 'shield', 'Validação']];
   $('#tabs').innerHTML = tabs.map(t => `<button role="tab" class="tab" data-action="tab" data-v="${t[0]}" aria-selected="${S.view === t[0]}">${ico(t[1])}${t[2]}${t[0] === 'validation' && bad ? '<span class="dot" style="background:var(--amber);border-radius:50%;width:8px;height:8px"></span>' : ''}</button>`).join('');
 }
 function showView() {
-  ['overview', 'table', 'validation', 'grupo', 'diag'].forEach(v => $('#view-' + v).classList.toggle('hidden', v !== S.view));
-  $('#filters').classList.toggle('hidden', S.view === 'validation' || S.view === 'grupo');
+  ['overview', 'exec', 'table', 'validation', 'grupo', 'diag'].forEach(v => $('#view-' + v).classList.toggle('hidden', v !== S.view));
+  $('#filters').classList.toggle('hidden', S.view === 'validation' || S.view === 'grupo' || S.view === 'exec');
   $('#filters').classList.toggle('nodt', S.view === 'diag');   /* o Diagnóstico escolhe a competência na própria aba */
-  $('#emp-bar').toggleAttribute('hidden', S.view === 'grupo');   /* a aba Grupo usa todas as empresas */
-  $('#alerts').toggleAttribute('hidden', S.view === 'grupo');
-  renderHeader(); renderAdvNav(); updateFbar();
+  $('#emp-bar').toggleAttribute('hidden', S.view === 'grupo' || S.view === 'exec');   /* Grupo e Central usam todas as empresas */   /* a aba Grupo usa todas as empresas */
+  $('#alerts').toggleAttribute('hidden', S.view === 'grupo' || S.view === 'exec');
+  renderHeader(); updateFbar();
 }
 function errorHtml(e, i) {
   const found = (e.tried || []).map(t => `aba “${esc(t.sheet)}” (${NUM.format(t.rows)} linhas)${t.sample.length ? ': ' + esc(t.sample.join(' | ')) : ''}`).join('; ');
@@ -1215,10 +1218,10 @@ function renderAlerts() {
   }
   $('#alerts').innerHTML = out.join('') + (seg.length ? `<div class="statusline" role="status">${seg.join('')}</div>` : '');
 }
-function renderAll() { applyFilter(); renderHeader(); renderAlerts(); syncFilters(); showView(); renderActiveView(); }
+function renderAll() { applyFilter(); renderAlerts(); syncFilters(); showView(); renderActiveView(); }
 function renderActiveView() {
   renderHeader();
-  if (S.view === 'overview') renderOverview(); else if (S.view === 'table') renderTable(); else if (S.view === 'grupo') renderGrupo(); else if (S.view === 'diag') renderDiag(); else renderValidation();
+  if (S.view === 'overview') renderOverview(); else if (S.view === 'table') renderTable(); else if (S.view === 'grupo') renderGrupo(); else if (S.view === 'exec') renderExec(); else if (S.view === 'diag') renderDiag(); else renderValidation();
 }
 
 /* ---------- Visão geral ---------- */
@@ -1657,9 +1660,9 @@ function exportXlsx() {
 }
 function renderPrintHead() {
   const m = S.meta;
-  $('#print-head').innerHTML = `<div style="border-bottom:2px solid #0d6b73;padding-bottom:8px;margin-bottom:10px"><div style="font-size:18px;font-weight:600">Dashboard de faturamento NFS-e${S.view === 'grupo' ? ' | Faturamento entre empresas do Grupo' : S.view === 'diag' ? ' | Diagnóstico' : ''}</div>
-    <div style="font-size:12px;color:#37495a">${esc([m.empresa, m.cnpj ? 'CNPJ ' + m.cnpj : '', m.periodoDe ? `competência ${m.periodoDe} a ${m.periodoAte}` : ''].filter(Boolean).join(', '))}</div>
-    <div style="font-size:11px;color:#5b6d79;margin-top:3px">Filtros: ${esc((S.view === 'grupo' ? describeG() : describeFilters()).join(' | '))}. Gerado em ${new Date().toLocaleString('pt-BR')}.</div></div>`;
+  $('#print-head').innerHTML = `<div style="border-bottom:2px solid #0d6b73;padding-bottom:8px;margin-bottom:10px"><div style="font-size:18px;font-weight:600">Dashboard de faturamento NFS-e${S.view === 'grupo' ? ' | Faturamento entre empresas do Grupo' : S.view === 'diag' ? ' | Diagnóstico' : S.view === 'exec' ? ' | Central Executiva' : ''}</div>
+    <div style="font-size:12px;color:#37495a">${esc([S.view === 'exec' ? 'Todas as empresas emitentes dos arquivos' : m.empresa, S.view !== 'exec' && m.cnpj ? 'CNPJ ' + m.cnpj : '', m.periodoDe ? `competência ${m.periodoDe} a ${m.periodoAte}` : ''].filter(Boolean).join(', '))}</div>
+    <div style="font-size:11px;color:#5b6d79;margin-top:3px">Filtros: ${esc((S.view === 'grupo' ? describeG() : S.view === 'exec' ? describeX() : describeFilters()).join(' | '))}. Gerado em ${new Date().toLocaleString('pt-BR')}.</div></div>`;
 }
 function exportPDF() {
   S.wasDark = document.documentElement.classList.contains('dark');
@@ -1879,7 +1882,7 @@ const DIAG = {
   atipicoMult: 3, atipicoMinNotas: 5,                      /* nota atípica: acima de 3x a mediana do tomador, que precisa ter ao menos 5 notas */
   topN: [1, 5, 10, 20],
 };
-const DSEC = [['cresc', 'Crescimento'], ['cart', 'Carteira'], ['comp', 'Composição'], ['trib', 'Tributos'], ['pad', 'Padrões'], ['alert', 'Alertas'], ['conf', 'Conferências']];
+const DSEC = [['cresc', 'Crescimento'], ['cart', 'Carteira'], ['comp', 'Composição'], ['trib', 'Tributos'], ['pad', 'Padrões'], ['intel', 'Inteligência'], ['alert', 'Alertas'], ['conf', 'Conferências']];
 const D_WD = [1, 2, 3, 4, 5, 6, 0], D_WDN = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 
 /* ---------- cálculo (funções sem efeito colateral) ---------- */
@@ -2274,6 +2277,63 @@ function dChecks(D, X) {
   else add('info', 'Padrões de emissão', 'A planilha não tem a coluna Data de Emissão.');
   return out;
 }
+/* --- Inteligência analítica: indicadores derivados, determinísticos e explicáveis --- */
+function dInsightCard(title, value, sub, cls='') {
+  return `<div class="kpi"><div class="kpi-l">${title}</div><div class="kpi-v ${cls}">${value}</div><div class="kpi-s">${sub}</div></div>`;
+}
+function dSecIntel(D, X) {
+  const { ref, rr } = X, rows = D.rows, prev = rows.get(dPrevYm(ref)), yearAgo = rows.get(dYearAgo(ref));
+  const ordered = D.months.filter(m => rows.get(m).vc !== undefined);
+  const prior3 = ordered.filter(m => m < ref).slice(-3);
+  const avg3 = prior3.length ? prior3.reduce((a,m)=>a+rows.get(m).vc,0)/prior3.length : null;
+  const delta3 = avg3 === null || avg3 === 0 ? null : (rr.vc-avg3)/Math.abs(avg3);
+  const ticket = rr.n ? rr.vc/rr.n : null, ticketPrev = prev && prev.n ? prev.vc/prev.n : null;
+  const ticketVar = ticketPrev === null || ticketPrev === 0 ? null : (ticket-ticketPrev)/Math.abs(ticketPrev);
+  const activePrev = prev ? prev.tm.size : null;
+  const recurring = prev ? [...rr.tm.keys()].filter(k=>prev.tm.has(k)).length : null;
+  const retention = activePrev ? recurring/activePrev : null;
+  const lost = prev ? [...prev.tm.keys()].filter(k=>!rr.tm.has(k)).length : null;
+  const newClients = prev ? [...rr.tm.keys()].filter(k=>!prev.tm.has(k)).length : null;
+  const top = [...rr.tm.entries()].sort((a,b)=>b[1].vc-a[1].vc);
+  const top5 = top.slice(0,5).reduce((a,[,v])=>a+v.vc,0), conc5 = rr.vc ? top5/rr.vc : null;
+  const hhi = rr.vc ? top.reduce((a,[,v])=>a+Math.pow(v.vc/rr.vc,2),0) : null;
+  const issRate = rr.vc ? rr.ic/rr.vc : null;
+  const prior = prev ? dBridge(D, ref, dPrevYm(ref)) : null;
+  const opGroups = groupBy(rr.list, n => n.opv || n.cat || 'Sem classificação').sort((a,b)=>b.vc-a.vc);
+  const topOp = opGroups[0];
+  const topOpShare = rr.vc && topOp ? topOp.vc/rr.vc : null;
+  const signals = [];
+  if (delta3 !== null && prior3.length >= 2) signals.push({s: delta3 >= 0 ? 'ok' : 'warn', t: `Faturamento ${delta3 >= 0 ? 'acima' : 'abaixo'} da média dos ${prior3.length} meses anteriores`, d: `${signed(delta3,x=>pct(x))}: ${money(rr.vc)} em ${fmtComp(ref)} contra média de ${money(avg3)}.`});
+  if (prev && prior) {
+    const abs = rr.vc-prev.vc;
+    if (abs !== 0) {
+      const arr = prior.items.filter(i=>i.d!==0).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d)).slice(0,3);
+      const parts = arr.map(i=>`${esc(trunc((S.tom.get(i.key)||{}).label||i.key,28))} ${signed(i.d,x=>money(x))}`);
+      signals.push({s: abs>=0?'ok':'warn', t:`Variação de ${fmtComp(ref)} explicada por carteira`, d:`${signed(abs,x=>money(x))} versus ${fmtComp(dPrevYm(ref))}. Principais movimentos: ${parts.length?parts.join('; '):'sem movimentos relevantes'}.`});
+    }
+  }
+  if (retention !== null) signals.push({s: retention>=0.8?'ok':retention>=0.6?'warn':'err', t:'Retenção da carteira', d:`${pct(retention)} dos tomadores da competência anterior permaneceram ativos. ${newClients===null?'':`${NUM.format(newClients)} novos e ${NUM.format(lost)} perdidos.`}`});
+  if (conc5 !== null) signals.push({s: conc5>=0.7?'warn':'ok', t:'Concentração nos 5 maiores tomadores', d:`${pct(conc5)} do faturamento de ${fmtComp(ref)} está concentrado nos cinco maiores tomadores.`});
+  if (hhi !== null) signals.push({s: hhi>=0.25?'warn':hhi>=0.15?'info':'ok', t:'Índice de concentração (HHI)', d:`${hhi.toFixed(3)}. Quanto maior, maior a dependência de poucos tomadores.`});
+  if (ticketVar !== null) signals.push({s: ticketVar>=0?'ok':'warn', t:'Ticket médio', d:`${signed(ticketVar,x=>pct(x))} contra ${fmtComp(dPrevYm(ref))}: ${money(ticket)} por NFS-e.`});
+  if (topOpShare !== null) signals.push({s: topOpShare>=0.7?'warn':'ok', t:'Dependência da principal operação', d:`${esc(topOp.key)} representa ${pct(topOpShare)} do faturamento da competência.`});
+  if (issRate !== null) signals.push({s:'info', t:'Intensidade do ISSQN', d:`ISSQN corresponde a ${pct(issRate,2)} do faturamento informado em ${fmtComp(ref)}. Isso é um indicador descritivo, não cálculo de tributo devido.`});
+  if (yearAgo && yearAgo.vc) { const yoy = dVar(rr.vc, yearAgo.vc); signals.push({s: yoy === null ? 'info' : yoy >= 0 ? 'ok' : 'warn', t:'Comparação anual', d:`${yoy === null ? 'Sem variação calculável' : signed(yoy,x=>pct(x))} contra ${fmtComp(dYearAgo(ref))}.`}); }
+  if (D.inc && D.inc.ym===ref) signals.push({s:'warn', t:'Competência possivelmente incompleta', d:esc(D.inc.why)+'. As conclusões sobre a competência devem ser tratadas com cautela.'});
+  const score = Math.max(0, Math.min(100, 70 + (retention===null?0:(retention-.8)*50) - (conc5===null?0:Math.max(0,conc5-.6)*40) + (delta3===null?0:Math.max(-10,Math.min(10,delta3*10)))));
+  const kpis = `<div class="card kpis kn" style="--kc:5">
+    ${dInsightCard('Retenção da carteira', retention===null?'—':pct(retention), activePrev===null?'Sem competência anterior disponível':`${NUM.format(recurring)} recorrentes de ${NUM.format(activePrev)} tomadores anteriores.`)}
+    ${dInsightCard('Concentração Top 5', conc5===null?'—':pct(conc5), `${NUM.format(Math.min(5,top.length))} maiores tomadores em ${fmtComp(ref)}.`)}
+    ${dInsightCard('Ticket médio', ticket===null?'—':money(ticket), ticketVar===null?'Sem comparação disponível':`${signed(ticketVar,x=>pct(x))} vs. mês anterior.`)}
+    ${dInsightCard('Principal operação', topOpShare===null?'—':pct(topOpShare), topOp ? esc(topOp.key) : 'Sem classificação')}
+    ${dInsightCard('Intensidade ISSQN', issRate===null?'—':pct(issRate,2), `${money(rr.ic)} sobre ${money(rr.vc)} de faturamento.`)}
+  </div>`;
+  const narrative = signals.length ? `<div class="card"><div class="card-h"><div><h2 class="t-title">Leitura analítica de ${fmtComp(ref)}</h2><p class="t-sub">Conclusões geradas exclusivamente a partir dos dados importados. Nenhum indicador estima margem, recebimento ou lucro.</p></div></div><div class="card-b">${signals.map(x=>`<div class="g-chk">${stIcon(x.s)}<div><b>${esc(x.t)}.</b> ${x.d}</div></div>`).join('')}</div></div>` : '';
+  const topRows = top.slice(0,10).map(([k,v],i)=>`<tr><td>${i+1}</td><td class="wrap">${esc((S.tom.get(k)||{}).label||k)}</td><td class="r">${money(v.vc)}</td><td class="r">${rr.vc?pct(v.vc/rr.vc):'—'}</td><td class="r">${NUM.format(v.n)}</td></tr>`).join('');
+  const detail = `<div class="card"><div class="card-h"><div><h3 class="t-title">Estrutura da carteira</h3><p class="t-sub">Concentração e volume dos principais tomadores na competência de referência.</p></div></div><div class="card-b !px-0"><div class="scroll-x"><table class="tbl compact"><thead><tr><th>#</th><th>Tomador</th><th class="r">Faturamento</th><th class="r">% do total</th><th class="r">NFS-e</th></tr></thead><tbody>${topRows}</tbody></table></div></div></div>`;
+  return { html: kpis + narrative + detail, draw: null };
+}
+
 function dSecConf(D, X, checks) {
   return { html: `<div><h2 class="t-title">Conferências do Diagnóstico</h2><p class="t-sub">Cada bloco desta aba é conferido contra a base filtrada. Valem para a competência de referência e os filtros atuais.</p></div><div class="card"><div class="card-b">${checks.map(c => `<div class="g-chk">${stIcon(c.s)}<div><b>${esc(c.t)}.</b> ${c.d}</div></div>`).join('')}</div></div>`, draw: null };
 }
@@ -2285,7 +2345,7 @@ function renderDiag() {
   const D = dModel();
   if (!D.months.length) { el.innerHTML = `<div class="card">${dEmptyMsg('Nenhuma NFS-e com competência no filtro atual. Ajuste os filtros para ver o diagnóstico.')}</div>`; return; }
   const X = dContext(D), st = X.st, checks = dChecks(D, X), bad = checks.filter(c => c.s === 'err').length, good = checks.filter(c => c.s === 'ok').length;
-  const sec = ({ cresc: dSecCresc, cart: dSecCart, comp: dSecComp, trib: dSecTrib, pad: dSecPad, alert: dSecAlert })[st.sec];
+  const sec = ({ cresc: dSecCresc, cart: dSecCart, comp: dSecComp, trib: dSecTrib, pad: dSecPad, intel: dSecIntel, alert: dSecAlert })[st.sec];
   const body = st.sec === 'conf' ? dSecConf(D, X, checks) : (sec || dSecCresc)(D, X);
   const bar = `<section class="card no-print"><div class="dg-bar">
     <div class="g-f"><label class="lbl" for="d-ref">Competência de referência</label><select id="d-ref" class="inp">${[...D.months].reverse().map(m => `<option value="${m}" ${m === X.ref ? 'selected' : ''}>${fmtComp(m)}</option>`).join('')}</select></div>
@@ -2297,6 +2357,462 @@ function renderDiag() {
   if (bad) notes.push(`<div class="alert al-err"><span class="ai">${ico('alert')}</span><div class="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1"><span><b class="font-medium">${bad} ${bad === 1 ? 'conferência não fecha' : 'conferências não fecham'}.</b> Os números desta aba não devem ser usados até resolver.</span><button class="btn btn-sm no-print" data-action="d-sec" data-v="conf">Ver conferências</button></div></div>`);
   el.innerHTML = bar + notes.join('') + body.html;
   if (body.draw) body.draw();
+}
+
+/* =====================================================================
+   CENTRAL EXECUTIVA (Fase 5.1): KPIs executivos e análise por empresa emitente
+   Base: todas as NFS-e carregadas (S.allNotes), de todas as empresas emitentes, exceto canceladas.
+   Nada aqui altera registros. Valores em centavos. Sem indicadores novos além de somas, contagens,
+   razões entre colunas e variações percentuais, todos conferidos na seção "Conferências".
+   ===================================================================== */
+const X_TOPN = 5;   /* quantos tomadores listar no detalhe da empresa */
+function xState() { if (!S.X) S.X = { ref: '', base: 'todas', emp: '', sec: 'emp' }; if (!S.X.sec) S.X.sec = 'emp'; return S.X; }
+
+/* Agrupa tomadores de uma lista de NFS-e, do maior para o menor faturamento. */
+function xTomadores(list) {
+  const m = new Map();
+  for (const n of list) {
+    let t = m.get(n.tomKey);
+    if (!t) m.set(n.tomKey, t = { key: n.tomKey, vc: 0, n: 0, doc: n.doc, docD: n.docD, names: new Map() });
+    t.vc += n.vc; t.n++; t.names.set(n.tom, (t.names.get(n.tom) || 0) + n.vc);
+  }
+  const arr = [...m.values()].sort((a, b) => b.vc - a.vc || (a.key < b.key ? -1 : 1));
+  for (const t of arr) t.name = [...t.names.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
+  return arr;
+}
+
+/* Competência mais recente possivelmente incompleta (mesma regra do Diagnóstico). */
+function xIncomplete(last) {
+  const pAte = S.sources.map(s => dIso(s.meta.periodoAte)).filter(Boolean).sort().pop() || '';
+  const emis = S.sources.map(s => dIso(s.meta.emissao)).filter(Boolean).sort().pop() || '';
+  const end = monthEnd(last);
+  if (pAte && pAte < end) return `o período do relatório vai só até ${fmtDate(pAte)}, antes do fim da competência (${fmtDate(end)})`;
+  if (emis && emis < end) return `o relatório foi gerado em ${fmtDate(emis)}, antes do fim da competência (${fmtDate(end)})`;
+  return '';
+}
+
+function xModel() {
+  const st = xState(), M = gMembers(), mset = new Set(M.map(m => m.cnpj)), byC = new Map(M.map(m => [m.cnpj, m]));
+  const isPair = n => mset.has(n.emp) && mset.has(n.docD) && n.emp !== n.docD;   /* emitente e tomador são empresas do Grupo */
+  const all = S.allNotes, canc = all.filter(n => isCancel(n.sit));
+  const valid = all.filter(n => !isCancel(n.sit) && n.ym);
+  const semComp = all.filter(n => !isCancel(n.sit) && !n.ym).length;
+  const intra = valid.filter(isPair);
+  const base = st.base === 'terceiros' ? valid.filter(n => !isPair(n)) : valid;
+  const present = [...new Set(base.map(n => n.ym))].sort(), months = [];
+  if (present.length) { let k = present[0], g = 0; while (k <= present[present.length - 1] && g++ < 1200) { months.push(k); k = nextMonth(k); } }
+  const last = months.length ? months[months.length - 1] : null;
+  if (!months.includes(st.ref)) st.ref = last || '';
+  const ref = st.ref, prev = ref ? dPrevYm(ref) : '', yr = ref.slice(0, 4);
+  const byM = new Map(months.map(m => [m, []])); for (const n of base) byM.get(n.ym).push(n);
+  const byEM = new Map();   /* empresa > competência > NFS-e */
+  for (const n of base) { let e = byEM.get(n.emp); if (!e) byEM.set(n.emp, e = new Map()); let l = e.get(n.ym); if (!l) e.set(n.ym, l = []); l.push(n); }
+  const emps = [...byEM.keys()];
+  const listOf = (emp, ym) => (byEM.get(emp) || new Map()).get(ym) || [];
+  const empAll = emp => [].concat(...[...(byEM.get(emp) || new Map()).values()]);
+  const ytdOf = list => list.filter(n => n.ym.slice(0, 4) === yr && n.ym <= ref);
+  const cur = summarize(byM.get(ref) || []), pv = months.includes(prev) ? summarize(byM.get(prev) || []) : null;
+  const ytdL = ytdOf(base), ytd = summarize(ytdL);
+  const ytdMonths = months.filter(m => m.slice(0, 4) === yr && m <= ref).length;
+  const rows = emps.map(emp => {
+    const L = listOf(emp, ref), c = summarize(L), p = pv ? summarize(listOf(emp, prev)) : null, y = summarize(ytdOf(empAll(emp)));
+    const top = xTomadores(L)[0] || null, tot = summarize(empAll(emp));
+    return { emp, c, p, y, tot, top, share: cur.vc ? c.vc / cur.vc : null, var: p ? dVar(c.vc, p.vc) : null };
+  }).sort((a, b) => b.c.vc - a.c.vc || b.tot.vc - a.tot.vc);
+  const incWhy = (ref && ref === last) ? xIncomplete(last) : '';
+  const total = summarize(base);
+  return { st, M, mset, byC, isPair, all, canc, valid, semComp, intra, base, months, last, ref, prev, yr, byM, byEM, emps, listOf, empAll, ytdOf, cur, pv, ytdL, ytd, ytdMonths, rows, incWhy, total };
+}
+
+const xVarHtml = v => v === null ? '<span class="muted">—</span>' : `<span class="${dVarCls(v)}">${signed(v, x => pct(x))}</span>`;
+/* Variação com a base de comparação logo abaixo: percentuais enormes costumam vir de bases minúsculas. */
+const xVarCell = (v, baseCents) => v === null ? '<span class="muted">—</span>' : `${xVarHtml(v)}<div class="muted text-xs">base ${money(baseCents)}</div>`;
+const xNum = n => n ? NUM.format(n) : '<span class="muted">—</span>';
+const xMoney = (c, n) => n ? money(c) : '<span class="muted">—</span>';
+
+
+/* ---------------------------------------------------------------------
+   Recorrência dos tomadores (Fase 5.2)
+   Tomador = CPF/CNPJ (ou nome, se não houver documento). Para uma competência de referência (índice i),
+   usa só as competências até ela. A = competências com NFS-e; W = competências desde a primeira NFS-e do
+   tomador até a referência (inclusive); frequência = A ÷ W. Regras, nesta ordem:
+     Inativo      = nenhuma NFS-e nas últimas K competências (a referência conta)
+     Novo         = histórico de menos de H competências (W < H)
+     Fixo         = frequência >= F%        Intermitente = frequência >= I%        Esporádico = o restante
+   A primeira competência é a primeira da base carregada: o tomador pode ter começado antes.
+   --------------------------------------------------------------------- */
+const X_REC_DEF = { fixo: 80, interm: 40, k: 3, hist: 3 };
+const X_CLS = ['fixo', 'interm', 'esp', 'novo', 'inat'];
+const X_CLS_L = { fixo: 'Fixo', interm: 'Intermitente', esp: 'Esporádico', novo: 'Novo', inat: 'Inativo' };
+const X_CLS_B = { fixo: 'b-pos', interm: 'b-info', esp: 'b-amber', novo: 'b-brand', inat: 'b-mute' };
+function xRecP() { const st = xState(); return st.rec || (st.rec = { ...X_REC_DEF }); }
+function xRecValid(r) {
+  const int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b;
+  return int(r.fixo, 2, 100) && int(r.interm, 1, 99) && r.interm < r.fixo && int(r.k, 1, 12) && int(r.hist, 1, 12);
+}
+function xPerfis(list, months) {
+  const idx = new Map(months.map((m, i) => [m, i])), by = new Map();
+  for (const n of list) {
+    let t = by.get(n.tomKey);
+    if (!t) by.set(n.tomKey, t = { key: n.tomKey, doc: n.doc, docD: n.docD, vc: new Map(), names: new Map() });
+    t.vc.set(n.ym, (t.vc.get(n.ym) || 0) + n.vc); t.names.set(n.tom, (t.names.get(n.tom) || 0) + n.vc);
+  }
+  for (const t of by.values()) {
+    t.name = [...t.names.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
+    t.idx = [...t.vc.keys()].map(m => idx.get(m)).sort((a, b) => a - b);
+  }
+  return [...by.values()];
+}
+function xClass(t, i, P) {
+  let A = 0, first = -1, last = -1;
+  for (const k of t.idx) { if (k > i) break; if (first < 0) first = k; last = k; A++; }
+  if (first < 0) return null;
+  const W = i - first + 1;
+  const c = last < i - P.k + 1 ? 'inat' : W < P.hist ? 'novo' : A * 100 >= P.fixo * W ? 'fixo' : A * 100 >= P.interm * W ? 'interm' : 'esp';
+  return { c, A, W, first, last };
+}
+/* Classifica todos os tomadores na competência de índice i e soma por perfil. */
+function xRec(perfis, months, i, P) {
+  const ref = months[i], sum = {}, rows = [];
+  for (const c of X_CLS) sum[c] = { n: 0, vc: 0, hist: 0 };
+  for (const t of perfis) {
+    const k = xClass(t, i, P); if (!k) continue;
+    let hist = 0; for (const [m, v] of t.vc) if (m <= ref) hist += v;
+    const vc = t.vc.get(ref) || 0, s = sum[k.c]; s.n++; s.vc += vc; s.hist += hist;
+    rows.push({ t, c: k.c, A: k.A, W: k.W, first: k.first, last: k.last, vc, hist });
+  }
+  return { sum, rows };
+}
+
+/* ---------------------------------------------------------------------
+   Alertas de concentração e perda de carteira (Fase 5.3)
+   Concentração (por competência, sobre o faturamento da base escolhida):
+     maior tomador = maior fatia; Top 5 = soma das 5 maiores fatias; HHI = soma dos quadrados das fatias x 10.000.
+     Nível: Atenção / Crítico quando atinge os limites. Tendência: Top 5 acima da média das L competências anteriores.
+   Perda de carteira: tomadores relevantes = os N maiores pela soma das L competências anteriores à referência.
+     Sumiu = sem NFS-e na referência. Caiu = faturamento na referência até (100 - Q)% da média anterior.
+     R$ em risco = média anterior (sumiu) ou média anterior menos o faturado (caiu).
+   Os limites são editáveis e aparecem escritos em cada alerta.
+   --------------------------------------------------------------------- */
+const X_ALT_DEF = { t1a: 25, t1c: 40, t5a: 50, t5c: 70, hha: 1500, hhc: 2500, pp: 5, topN: 10, queda: 30, L: 3 };
+function xAltP() { const st = xState(); return st.alt || (st.alt = { ...X_ALT_DEF }); }
+function xAltValid(p) {
+  const int = (v, a, b) => Number.isInteger(v) && v >= a && v <= b;
+  return int(p.t1a, 1, 99) && int(p.t1c, 2, 100) && p.t1a < p.t1c && int(p.t5a, 1, 99) && int(p.t5c, 2, 100) && p.t5a < p.t5c
+    && int(p.hha, 1, 9999) && int(p.hhc, 2, 10000) && p.hha < p.hhc && int(p.pp, 1, 50) && int(p.topN, 1, 50) && int(p.queda, 1, 99) && int(p.L, 1, 6);
+}
+function xSetAlt(key, v) {
+  const p = xAltP(), nv = { ...p, [key]: v === '' ? NaN : Number(v) };
+  if (xAltValid(nv)) Object.assign(p, nv); else toast('Valor inválido. Use números inteiros, com o limite de Atenção menor que o Crítico (maior tomador e Top 5 em %, HHI de 1 a 10.000; relevantes de 1 a 50; queda de 1 a 99%; base de 1 a 6 competências).');
+  renderExec();
+}
+/* Concentração de uma lista de tomadores já ordenada (xTomadores). */
+function xConc(toms) {
+  const total = toms.reduce((a, t) => a + t.vc, 0);
+  const top1 = toms.length ? toms[0].vc : 0, top5 = toms.slice(0, 5).reduce((a, t) => a + t.vc, 0);
+  let hhi = 0; if (total) for (const t of toms) hhi += (t.vc / total) * (t.vc / total);
+  return { n: toms.length, total, top1, top5, hhi: hhi * 10000, top: toms[0] || null };
+}
+const xLv = (v, tot, a, c) => !tot ? 'ok' : v * 100 >= c * tot ? 'err' : v * 100 >= a * tot ? 'warn' : 'ok';
+const xLvH = (h, a, c) => h >= c ? 'err' : h >= a ? 'warn' : 'ok';
+const xWorst = (...l) => l.includes('err') ? 'err' : l.includes('warn') ? 'warn' : 'ok';
+const xLvBadge = l => `<span class="badge ${l === 'err' ? 'b-neg' : l === 'warn' ? 'b-amber' : 'b-pos'}">${l === 'err' ? 'Crítico' : l === 'warn' ? 'Atenção' : 'Normal'}</span>`;
+/* Tendência: Top 5 da referência menos a média do Top 5 nas L competências anteriores (só as com faturamento). */
+function xTendencia(concM, months, i, L) {
+  if (i < L) return null;
+  const sh = []; for (let k = i - L; k < i; k++) { const c = concM.get(months[k]); if (c && c.total) sh.push(c.top5 / c.total); }
+  const cur = concM.get(months[i]); if (!sh.length || !cur || !cur.total) return null;
+  const avg = sh.reduce((a, v) => a + v, 0) / sh.length;
+  return { avg, cur: cur.top5 / cur.total, d: cur.top5 / cur.total - avg };
+}
+function xPerda(perfis, months, i, AP, clsMap) {
+  const L = AP.L; if (i < L) return null;
+  const win = months.slice(i - L, i), ref = months[i], items = [];
+  for (const t of perfis) { let S = 0; for (const m of win) S += t.vc.get(m) || 0; if (S > 0) items.push({ t, S }); }
+  items.sort((a, b) => b.S - a.S || (a.t.key < b.t.key ? -1 : 1));
+  const rel = items.slice(0, AP.topN).map(it => {
+    const vc = it.t.vc.get(ref) || 0; let st = 'ok', risk = 0;
+    if (vc === 0) { st = 'sumiu'; risk = Math.floor((2 * it.S + L) / (2 * L)); }
+    else if (vc * 100 * L <= it.S * (100 - AP.queda)) { st = 'caiu'; risk = Math.floor((2 * (it.S - L * vc) + L) / (2 * L)); }
+    return { t: it.t, S: it.S, avg: Math.floor((2 * it.S + L) / (2 * L)), vc, st, risk, cls: clsMap.get(it.t.key) || null };
+  });
+  const alerts = rel.filter(r => r.st !== 'ok');
+  return { L, win, rel, alerts, risk: alerts.reduce((a, r) => a + r.risk, 0) };
+}
+
+/* Sinais objetivos para a leitura do resumo: posição da competência, empresas e maiores variações em R$. */
+function xSinais(X) {
+  const { months, cur, pv, rows, byM, incWhy } = X;
+  const vcs = months.map(m => ({ m, vc: summarize(byM.get(m)).vc }));
+  const rank = incWhy ? null : 1 + vcs.filter(x => x.vc > cur.vc).length;
+  const best = vcs.reduce((a, x) => x.vc > a.vc ? x : a, vcs[0]);
+  const act = rows.filter(r => r.c.n), top = act[0] || null, second = act[1] || null;
+  const sh = r => cur.vc && r ? r.c.vc / cur.vc : null;
+  const mv = pv ? rows.filter(r => r.p && (r.c.n || r.p.n)).map(r => ({ r, d: r.c.vc - r.p.vc })) : [];
+  const up = mv.length ? mv.reduce((a, x) => x.d > a.d ? x : a, mv[0]) : null, down = mv.length ? mv.reduce((a, x) => x.d < a.d ? x : a, mv[0]) : null;
+  return { rank, nMonths: months.length, best, top, topShare: sh(top), top2Share: top ? sh(top) + (second ? sh(second) : 0) : null, nAct: act.length, up: up && up.d > 0 ? up : null, down: down && down.d < 0 ? down : null };
+}
+function xSetRec(key, v) {
+  const r = xRecP(), nv = { ...r, [key]: v === '' ? NaN : Number(v) };
+  if (xRecValid(nv)) Object.assign(r, nv); else toast('Valor inválido. Fixo e Intermitente em %, com Intermitente menor que Fixo; as demais em competências (1 a 12).');
+  renderExec();
+}
+const xBadge = c => `<span class="badge ${X_CLS_B[c]}">${X_CLS_L[c]}</span>`;
+function xRecDefs(P) {
+  return `<b>Fixo</b>: NFS-e em ${P.fixo}% ou mais das competências desde a primeira. <b>Intermitente</b>: de ${P.interm}% a ${P.fixo - 1}%. <b>Esporádico</b>: abaixo de ${P.interm}%. <b>Novo</b>: menos de ${P.hist} ${P.hist === 1 ? 'competência' : 'competências'} de histórico. <b>Inativo</b>: sem NFS-e nas últimas ${P.k} ${P.k === 1 ? 'competência' : 'competências'}. Vale para o histórico carregado: o tomador pode ter começado antes da primeira competência da base.`;
+}
+
+function renderExec() {
+  const el = $('#view-exec'); if (!el) return;
+  const dOpen = document.getElementById('x-alt-det'); if (dOpen) xState().altOpen = dOpen.open;   /* o painel de limites continua aberto ao editar */
+  for (const id of ['c-exec-evo', 'c-exec-rec']) if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  if (!S.allNotes.length) { el.innerHTML = ''; return; }
+  const X = xModel(), st = X.st, th = theme(), P = pal();
+  if (!X.months.length) { el.innerHTML = `<div class="card">${dEmptyMsg('Nenhuma NFS-e com competência para analisar nesta base.')}</div>`; return; }
+  const { M, byC, months, ref, prev, yr, cur, pv, ytd, rows, total } = X;
+  const nm = c => (byC.get(c) || {}).curto || fmtCnpj(c), full = c => (byC.get(c) || {}).nome || fmtCnpj(c);
+  const colorOf = c => P[Math.max(0, M.findIndex(m => m.cnpj === c)) % P.length];
+  if (!X.emps.includes(st.emp)) st.emp = rows.length ? rows.reduce((a, b) => b.tot.vc > a.tot.vc ? b : a).emp : '';
+  const intraRef = summarize(X.intra.filter(n => n.ym === ref)), intraAll = summarize(X.intra);
+  /* ---- recorrência: perfis consolidados (base) e da empresa em detalhe ---- */
+  const RP = xRecP(), iRef = months.indexOf(ref);
+  const perfAll = xPerfis(X.base, months), recA = xRec(perfAll, months, iRef, RP);
+  const baseTxt = st.base === 'terceiros' ? 'sem o faturamento entre empresas do Grupo' : 'todas as NFS-e válidas';
+
+  /* ---- barra de controles ---- */
+  const bar = `<section class="card no-print"><div class="dg-bar">
+    <div class="g-f"><label class="lbl" for="x-ref">Competência de referência</label><select id="x-ref" class="inp">${[...months].reverse().map(m => `<option value="${m}" ${m === ref ? 'selected' : ''}>${fmtComp(m)}</option>`).join('')}</select></div>
+    <div class="g-f grow"><span class="lbl">Base de cálculo</span><div class="seg" role="group" aria-label="Base de cálculo" style="flex-wrap:wrap;max-width:100%">
+      <button data-action="x-base" data-v="todas" aria-pressed="${st.base === 'todas'}">Todas as NFS-e</button>
+      <button data-action="x-base" data-v="terceiros" aria-pressed="${st.base === 'terceiros'}">Sem faturamento entre empresas do Grupo</button></div></div>
+  </div></section>`;
+
+  /* ---- avisos ---- */
+  const notes = [];
+  if (X.incWhy) notes.push(`<div class="alert al-warn"><span class="ai">${ico('alert')}</span><div><b class="font-medium">${fmtComp(ref)} possivelmente incompleta:</b> ${esc(X.incWhy)}. Os valores desta competência podem crescer.</div></div>`);
+  if (st.base === 'todas' && intraAll.n) notes.push(`<div class="alert al-info"><span class="ai">${ico('info')}</span><div>A base inclui <b class="font-medium">${money(intraAll.vc)}</b> (${NUM.format(intraAll.n)} NFS-e) faturados entre empresas do Grupo, sendo <b class="font-medium">${money(intraRef.vc)}</b> em ${fmtComp(ref)}. Para ver só o faturamento com terceiros, escolha a base sem o faturamento entre empresas do Grupo.</div></div>`);
+  if (st.base === 'terceiros') notes.push(`<div class="alert al-info"><span class="ai">${ico('info')}</span><div>Base <b class="font-medium">sem o faturamento entre empresas do Grupo</b>: ${NUM.format(intraAll.n)} NFS-e (${money(intraAll.vc)}) foram retiradas de todas as telas desta aba.</div></div>`);
+
+  /* ---- KPIs ---- */
+  const dTxt = (a, b, f) => b === null ? '<span class="muted">sem competência anterior na base</span>' : `${xVarHtml(dVar(a, b))} contra ${fmtComp(prev)} (${f(b)})`;
+  const kpis = `<div class="card kpis kn" style="--kc:5">
+    <div class="kpi"><div class="kpi-l">Faturamento ${fmtComp(ref)}</div><div class="kpi-v">${money(cur.vc)}</div><div class="kpi-s">${dTxt(cur.vc, pv && pv.vc, money)}</div></div>
+    <div class="kpi"><div class="kpi-l">Acumulado ${yr}</div><div class="kpi-v">${money(ytd.vc)}</div><div class="kpi-s">${NUM.format(X.ytdMonths)} ${X.ytdMonths === 1 ? 'competência' : 'competências'}, média de ${X.ytdMonths ? money(Math.round(ytd.vc / X.ytdMonths)) : '—'} por competência</div></div>
+    <div class="kpi"><div class="kpi-l">NFS-e ${fmtComp(ref)}</div><div class="kpi-v">${NUM.format(cur.n)}</div><div class="kpi-s">${dTxt(cur.n, pv && pv.n, NUM.format)}</div></div>
+    <div class="kpi"><div class="kpi-l">Tomadores ${fmtComp(ref)}</div><div class="kpi-v">${NUM.format(cur.tom)}</div><div class="kpi-s">${dTxt(cur.tom, pv && pv.tom, NUM.format)}</div></div>
+    <div class="kpi"><div class="kpi-l">ISSQN ${fmtComp(ref)}</div><div class="kpi-v">${money(cur.ic)}</div><div class="kpi-s">${cur.vc ? pct(cur.ic / cur.vc, 2) + ' do faturamento (ISSQN ÷ Vlr. Serviço)' : '—'}</div></div>
+  </div>`;
+
+  /* ---- tabela por empresa (competência de referência) ---- */
+  const topTotal = total && cur.vc ? xTomadores(X.byM.get(ref) || [])[0] : null;
+  const tomCell = (t, base) => !t ? '<span class="muted">—</span>' : `<div class="truncate" style="max-width:240px" title="${esc(t.name)}">${esc(t.name)}</div><div class="muted text-xs">${base ? pct(t.vc / base) + ' · ' : ''}${money(t.vc)}${X.mset.has(t.docD) ? ' · empresa do Grupo' : ''}</div>`;
+  const empRows = rows.map(r => `<tr class="${r.emp === st.emp ? 'dg-hl' : ''}"><td><span class="inline-block h-2.5 w-2.5 rounded-sm align-middle" style="background:${colorOf(r.emp)}"></span> <span class="font-medium" title="${esc(full(r.emp))}">${esc(nm(r.emp))}</span></td>
+    <td class="r">${xNum(r.c.n)}</td><td class="r">${xMoney(r.c.vc, r.c.n)}</td><td class="r">${r.share === null || !r.c.n ? '<span class="muted">—</span>' : pct(r.share)}</td>
+    <td class="r">${xVarCell(r.var, r.p ? r.p.vc : 0)}</td><td class="r">${r.c.n ? money(Math.round(r.c.vc / r.c.n)) : '<span class="muted">—</span>'}</td><td class="r">${xNum(r.c.tom)}</td>
+    <td class="wrap">${tomCell(r.top, r.c.vc)}</td><td class="r">${xMoney(r.y.vc, r.y.n)}</td></tr>`).join('');
+  const empCard = dCard('Faturamento por empresa emitente', `${fmtComp(ref)}, base: ${baseTxt}. Empresa = CNPJ do emitente. Variação contra ${pv ? fmtComp(prev) : 'a competência anterior (não está na base)'}, com o valor-base abaixo de cada percentual.`,
+    `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Empresa</th><th class="r">NFS-e</th><th class="r">Faturamento</th><th class="r">% do total</th><th class="r">Variação</th><th class="r">Ticket médio</th><th class="r">Tomadores</th><th>Maior tomador</th><th class="r">Acumulado ${yr}</th></tr></thead><tbody>${empRows}</tbody>
+    <tfoot><tr><td>Total</td><td class="r">${NUM.format(cur.n)}</td><td class="r">${money(cur.vc)}</td><td class="r">${cur.vc ? '100,0%' : '—'}</td><td class="r">${xVarCell(pv ? dVar(cur.vc, pv.vc) : null, pv ? pv.vc : 0)}</td><td class="r">${cur.n ? money(Math.round(cur.vc / cur.n)) : '—'}</td><td class="r">${NUM.format(cur.tom)}</td><td class="wrap">${tomCell(topTotal, cur.vc)}</td><td class="r">${money(ytd.vc)}</td></tr></tfoot></table></div>
+    <p class="dg-note">Tomadores não se somam entre empresas: o mesmo tomador pode receber NFS-e de mais de uma empresa, então o total mostra tomadores distintos.</p>`);
+
+  /* ---- gráfico: faturamento por competência, empilhado por empresa ---- */
+  const evoCard = `<div class="card"><div class="card-h"><div><h3 class="t-title">Faturamento por competência e empresa</h3><p class="t-sub">Vlr. Serviço por empresa emitente, base: ${baseTxt}.</p></div></div><div class="card-b"><div class="chart-box" style="height:340px"><canvas id="c-exec-evo" role="img" aria-label="Faturamento por competência, empilhado por empresa emitente"></canvas></div></div></div>`;
+
+  /* ---- recorrência (consolidada) ---- */
+  const rS = recA.sum, mz = v => v ? money(v) : '<span class="muted">—</span>', recPct = v => cur.vc ? pct(v / cur.vc) : '—';
+  const recTot = X_CLS.reduce((a, c) => ({ n: a.n + rS[c].n, vc: a.vc + rS[c].vc, hist: a.hist + rS[c].hist }), { n: 0, vc: 0, hist: 0 });
+  const recSeries = months.map((m, i) => i).filter(i => i >= RP.hist - 1).map(i => ({ i, m: months[i], sum: xRec(perfAll, months, i, RP).sum }));
+  const rInput = (id, lab, v, min, max) => `<div class="g-f"><label class="lbl" for="${id}">${lab}</label><input id="${id}" type="number" inputmode="numeric" class="inp" style="width:150px" min="${min}" max="${max}" step="1" value="${v}"></div>`;
+  const rBar = `<section class="card no-print"><div class="dg-bar">${rInput('x-r-fixo', 'Fixo a partir de (%)', RP.fixo, 2, 100)}${rInput('x-r-interm', 'Intermitente a partir de (%)', RP.interm, 1, 99)}${rInput('x-r-hist', 'Novo: histórico menor que (competências)', RP.hist, 1, 12)}${rInput('x-r-k', 'Inativo: sem NFS-e há (competências)', RP.k, 1, 12)}<button class="btn btn-ghost" data-action="x-rec-reset">${ico('x')}<span>Restaurar padrão</span></button></div></section>`;
+  const rNote = iRef < RP.hist - 1 ? `<div class="alert al-warn"><span class="ai">${ico('alert')}</span><div>${fmtComp(ref)} tem menos de ${RP.hist} competências de histórico na base: todos os tomadores aparecem como Novos. Escolha uma competência mais recente ou reduza o histórico mínimo.</div></div>` : '';
+  const rK = `<div class="card kpis kn" style="--kc:4">
+    <div class="kpi"><div class="kpi-l" title="Tomadores Fixos e Intermitentes">Faturamento recorrente ${fmtComp(ref)}</div><div class="kpi-v">${recPct(rS.fixo.vc + rS.interm.vc)}</div><div class="kpi-s">${money(rS.fixo.vc + rS.interm.vc)} de tomadores Fixos e Intermitentes</div></div>
+    <div class="kpi"><div class="kpi-l">Tomadores fixos</div><div class="kpi-v">${NUM.format(rS.fixo.n)}</div><div class="kpi-s">${money(rS.fixo.vc)} (${recPct(rS.fixo.vc)}) em ${fmtComp(ref)}</div></div>
+    <div class="kpi"><div class="kpi-l">Tomadores novos</div><div class="kpi-v">${NUM.format(rS.novo.n)}</div><div class="kpi-s">${money(rS.novo.vc)} (${recPct(rS.novo.vc)}) em ${fmtComp(ref)}</div></div>
+    <div class="kpi"><div class="kpi-l">Tomadores inativos</div><div class="kpi-v">${NUM.format(rS.inat.n)}</div><div class="kpi-s">${money(rS.inat.hist)} faturados no histórico, sem NFS-e nas últimas ${RP.k} ${RP.k === 1 ? 'competência' : 'competências'}</div></div>
+  </div>`;
+  const rRows = X_CLS.map(c => `<tr><td>${xBadge(c)}</td><td class="r">${xNum(rS[c].n)}</td><td class="r">${recTot.n && rS[c].n ? pct(rS[c].n / recTot.n) : '<span class="muted">—</span>'}</td><td class="r">${mz(rS[c].vc)}</td><td class="r">${rS[c].vc ? recPct(rS[c].vc) : '<span class="muted">—</span>'}</td><td class="r">${mz(rS[c].hist)}</td></tr>`).join('');
+  const rTbl = `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Perfil</th><th class="r">Tomadores</th><th class="r">% dos tomadores</th><th class="r">Faturamento ${fmtComp(ref)}</th><th class="r">% do faturamento</th><th class="r">Histórico até ${fmtComp(ref)}</th></tr></thead><tbody>${rRows}</tbody>
+    <tfoot><tr><td>Total</td><td class="r">${NUM.format(recTot.n)}</td><td class="r">${recTot.n ? '100,0%' : '—'}</td><td class="r">${money(recTot.vc)}</td><td class="r">${cur.vc ? '100,0%' : '—'}</td><td class="r">${money(recTot.hist)}</td></tr></tfoot></table></div>`;
+  const rCard = dCard('Faturamento e tomadores por perfil', xRecDefs(RP), rTbl);
+  const rChartCard = `<div class="card"><div class="card-h"><div><h3 class="t-title">Faturamento por perfil do tomador</h3><p class="t-sub">Cada competência é classificada só com o histórico até ela. Começa na ${RP.hist}ª competência da base. Inativos não faturam na competência e por isso não aparecem.</p></div></div><div class="card-b">${recSeries.length ? '<div class="chart-box" style="height:300px"><canvas id="c-exec-rec" role="img" aria-label="Faturamento por perfil de recorrência do tomador, por competência"></canvas></div>' : dEmptyMsg('Histórico insuficiente para este gráfico.')}</div></div>`;
+  const compN = (a, w) => `${NUM.format(a)} de ${NUM.format(w)}`;
+  const tomNm = t => `<div class="truncate" style="max-width:300px" title="${esc(t.name)}">${esc(t.name)}</div>${X.mset.has(t.docD) ? '<span class="badge b-info">Grupo</span>' : ''}`;
+  const rTop = recA.rows.filter(r => r.vc > 0).sort((a, b) => b.vc - a.vc || (a.t.key < b.t.key ? -1 : 1)).slice(0, 10);
+  const rTopCard = dCard(`Maiores tomadores de ${fmtComp(ref)} e seu perfil`, 'Competências ativas = quantas tiveram NFS-e, entre as desde a primeira.',
+    rTop.length ? `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>#</th><th>Tomador</th><th>Perfil</th><th class="r">Ativas</th><th>Desde</th><th class="r">Faturamento</th><th class="r">% do total</th></tr></thead><tbody>${rTop.map((r, k) => `<tr><td>${k + 1}</td><td class="wrap">${tomNm(r.t)}</td><td>${xBadge(r.c)}</td><td class="r">${compN(r.A, r.W)}</td><td>${fmtComp(months[r.first])}</td><td class="r">${money(r.vc)}</td><td class="r">${recPct(r.vc)}</td></tr>`).join('')}</tbody></table></div>` : dEmptyMsg('Sem NFS-e na competência.'));
+  const rInat = recA.rows.filter(r => r.c === 'inat').sort((a, b) => b.hist - a.hist || (a.t.key < b.t.key ? -1 : 1)).slice(0, 10);
+  const rInatCard = dCard('Inativos de maior histórico', `Tomadores sem NFS-e nas últimas ${RP.k} ${RP.k === 1 ? 'competência' : 'competências'} até ${fmtComp(ref)}, ordenados pelo faturamento no histórico.`,
+    rInat.length ? `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>#</th><th>Tomador</th><th>Última competência</th><th class="r">Ativas</th><th class="r">Histórico</th></tr></thead><tbody>${rInat.map((r, k) => `<tr><td>${k + 1}</td><td class="wrap">${tomNm(r.t)}</td><td>${fmtComp(months[r.last])}</td><td class="r">${compN(r.A, r.W)}</td><td class="r">${money(r.hist)}</td></tr>`).join('')}</tbody></table></div>` : dEmptyMsg('Nenhum tomador inativo na competência escolhida.'));
+  const recHtml = `<div id="x-sec-rec" class="x-pb" style="scroll-margin-top:90px"><h2 class="t-title">Recorrência dos tomadores</h2><p class="t-sub">Perfil de cada tomador pela frequência de competências com NFS-e, somando todas as empresas da base. Competência de referência: ${fmtComp(ref)}. Os cortes abaixo podem ser ajustados.</p></div>${rBar}${rNote}${rK}${rCard}${rChartCard}<div class="dg-2">${rTopCard}${rInatCard}</div>`;
+
+  /* ---- alertas de concentração e perda de carteira ---- */
+  const AP = xAltP();
+  const concM = new Map(months.map(m => [m, xConc(xTomadores(X.byM.get(m)))])), cc = concM.get(ref);
+  const tend = xTendencia(concM, months, iRef, AP.L);
+  const clsMap = new Map(recA.rows.map(r => [r.t.key, r.c]));
+  const perda = xPerda(perfAll, months, iRef, AP, clsMap);
+  const l1 = xLv(cc.top1, cc.total, AP.t1a, AP.t1c), l5 = xLv(cc.top5, cc.total, AP.t5a, AP.t5c), lH = xLvH(cc.hhi, AP.hha, AP.hhc);
+  const lT = tend ? (tend.d * 100 >= 2 * AP.pp ? 'err' : tend.d * 100 >= AP.pp ? 'warn' : 'ok') : 'ok';
+  const lP = !perda ? 'ok' : perda.alerts.some(r => r.st === 'sumiu') ? 'err' : perda.alerts.length ? 'warn' : 'ok';
+  const share = v => cc.total ? pct(v / cc.total) : '—';
+  const grupoTag = t => t && X.mset.has(t.docD) ? ' (empresa do Grupo)' : '';
+  const altList = [];
+  const addA = (s, t, d, regra) => altList.push({ s, t, d: `${d} <span class="muted">${regra}</span>` });
+  addA(l1, 'Maior tomador', `${cc.top ? esc(cc.top.name) + grupoTag(cc.top) + ': ' : ''}${share(cc.top1)} do faturamento (${money(cc.top1)}).`, `Atenção a partir de ${AP.t1a}%, crítico a partir de ${AP.t1c}%.`);
+  addA(l5, 'Cinco maiores tomadores', `${share(cc.top5)} do faturamento (${money(cc.top5)}).`, `Atenção a partir de ${AP.t5a}%, crítico a partir de ${AP.t5c}%.`);
+  addA(lH, 'Índice HHI', `${NUM.format(Math.round(cc.hhi))} pontos (soma dos quadrados das participações, de 0 a 10.000).`, `Atenção a partir de ${NUM.format(AP.hha)}, crítico a partir de ${NUM.format(AP.hhc)}.`);
+  if (tend) addA(lT, 'Tendência do Top 5', `${pct(tend.cur)} em ${fmtComp(ref)} contra média de ${pct(tend.avg)} nas ${AP.L} ${AP.L === 1 ? 'competência anterior' : 'competências anteriores'} (${signed(tend.d * 100, v => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }))} p.p.).`, `Atenção a partir de +${AP.pp} p.p., crítico a partir de +${2 * AP.pp} p.p.`);
+  else altList.push({ s: 'info', t: 'Tendência do Top 5', d: `Precisa de ${AP.L} ${AP.L === 1 ? 'competência anterior' : 'competências anteriores'} na base; ${fmtComp(ref)} não tem.` });
+  if (perda) addA(lP, 'Perda de carteira', perda.alerts.length ? `${NUM.format(perda.alerts.length)} de ${NUM.format(perda.rel.length)} tomadores relevantes ${perda.alerts.length === 1 ? 'sumiu ou caiu' : 'sumiram ou caíram'}; R$ em risco: ${money(perda.risk)} por competência.` : `Nenhum dos ${NUM.format(perda.rel.length)} tomadores relevantes sumiu ou caiu.`, `Relevantes: os ${AP.topN} maiores nas ${AP.L} ${AP.L === 1 ? 'competência anterior' : 'competências anteriores'}. Queda a partir de ${AP.queda}% sobre a média anterior. Crítico se algum sumiu, atenção se só caiu.`);
+  else altList.push({ s: 'info', t: 'Perda de carteira', d: `Precisa de ${AP.L} ${AP.L === 1 ? 'competência anterior' : 'competências anteriores'} na base; ${fmtComp(ref)} não tem.` });
+  if (st.base === 'todas' && cc.top && X.mset.has(cc.top.docD)) altList.push({ s: 'info', t: 'Concentração e Grupo', d: 'O maior tomador é uma empresa do Grupo. Para medir a concentração só com terceiros, escolha a base sem o faturamento entre empresas do Grupo.' });
+  const cv = [...concM.values()].filter(c => c.total), rg = f => { const v = cv.map(f); return v.length ? `${pct(Math.min(...v))} a ${pct(Math.max(...v))}` : '—'; };
+  const rangeTxt = cv.length ? `Na base escolhida (${baseTxt}), nas ${NUM.format(cv.length)} ${cv.length === 1 ? 'competência carregada' : 'competências carregadas'} o maior tomador ficou de ${rg(c => c.top1 / c.total)} e o Top 5, de ${rg(c => c.top5 / c.total)}, do faturamento. Os limites abaixo são pontos de partida e podem ser ajustados.` : 'Sem competências com faturamento na base escolhida.';
+  const nCrit = altList.filter(a => a.s === 'err').length, nAt = altList.filter(a => a.s === 'warn').length;
+  const aInput = (id, lab, v, min, max, w) => `<div class="g-f"><label class="lbl" for="${id}">${lab}</label><input id="${id}" type="number" inputmode="numeric" class="inp" style="width:${w || 110}px" min="${min}" max="${max}" step="1" value="${v}"></div>`;
+  const aBar = `<details id="x-alt-det" class="card no-print" ${st.altOpen ? 'open' : ''}><summary style="cursor:pointer;padding:12px 16px;font-weight:500">Limites e regras dos alertas (ajustáveis)</summary><div class="dg-bar" style="border-top:1px solid var(--line)">
+    ${aInput('x-a-t1a', 'Maior tomador: atenção (%)', AP.t1a, 1, 99, 150)}${aInput('x-a-t1c', 'Maior tomador: crítico (%)', AP.t1c, 2, 100, 150)}${aInput('x-a-t5a', 'Top 5: atenção (%)', AP.t5a, 1, 99, 130)}${aInput('x-a-t5c', 'Top 5: crítico (%)', AP.t5c, 2, 100, 130)}${aInput('x-a-hha', 'HHI: atenção', AP.hha, 1, 9999, 110)}${aInput('x-a-hhc', 'HHI: crítico', AP.hhc, 2, 10000, 110)}${aInput('x-a-pp', 'Tendência Top 5: atenção (p.p.)', AP.pp, 1, 50, 170)}
+    ${aInput('x-a-topN', 'Tomadores relevantes (N)', AP.topN, 1, 50, 150)}${aInput('x-a-queda', 'Queda que alerta (%)', AP.queda, 1, 99, 130)}${aInput('x-a-L', 'Competências de base', AP.L, 1, 6, 130)}<button class="btn btn-ghost" data-action="x-alt-reset">${ico('x')}<span>Restaurar padrão</span></button></div></details>`;
+  const altSummary = `<div class="card"><div class="card-h"><div><h3 class="t-title">Alertas de ${fmtComp(ref)}</h3><p class="t-sub">Base: ${baseTxt}. ${nCrit || nAt ? `${NUM.format(nCrit)} ${nCrit === 1 ? 'crítico' : 'críticos'} e ${NUM.format(nAt)} ${nAt === 1 ? 'em atenção' : 'em atenção'}.` : 'Nenhum alerta ativo.'} Os alertas só apontam pontos para verificar e não alteram registros.</p></div></div><div class="card-b">${altList.map(a => `<div class="g-chk">${stIcon(a.s)}<div><b>${a.t}.</b> ${a.d}</div></div>`).join('')}</div></div>`;
+  const concRows = [...months].reverse().map(m => {
+    const c = concM.get(m), a1 = xLv(c.top1, c.total, AP.t1a, AP.t1c), a5 = xLv(c.top5, c.total, AP.t5a, AP.t5c), aH = xLvH(c.hhi, AP.hha, AP.hhc), w = xWorst(a1, a5, aH);
+    return `<tr class="${m === ref ? 'dg-hl' : ''}"><td class="font-medium">${fmtComp(m)}</td><td class="r">${NUM.format(c.n)}</td><td class="wrap"><div class="truncate" style="max-width:260px" title="${esc(c.top ? c.top.name : '')}">${c.top ? esc(c.top.name) : '—'}</div>${c.top && X.mset.has(c.top.docD) ? '<span class="badge b-info">Grupo</span>' : ''}</td>
+      <td class="r">${c.total ? pct(c.top1 / c.total) : '—'}</td><td class="r">${c.total ? pct(c.top5 / c.total) : '—'}</td><td class="r">${c.total ? NUM.format(Math.round(c.hhi)) : '—'}</td><td>${c.total ? xLvBadge(w) : '<span class="muted">—</span>'}</td></tr>`;
+  }).join('');
+  const concCard = dCard('Concentração por competência', `Base: ${baseTxt}. Participação sobre o faturamento de cada competência. O nível é o pior entre maior tomador, Top 5 e HHI.`,
+    `<div class="scroll-y scroll-x" style="max-height:380px"><table class="tbl compact"><thead><tr><th>Competência</th><th class="r">Tomadores</th><th>Maior tomador</th><th class="r">Maior tomador %</th><th class="r">Top 5 %</th><th class="r">HHI</th><th>Nível</th></tr></thead><tbody>${concRows}</tbody></table></div>`);
+  const concEmpRows = rows.filter(r => r.c.n).map(r => {
+    const c = xConc(xTomadores(X.listOf(r.emp, ref))), w = xWorst(xLv(c.top1, c.total, AP.t1a, AP.t1c), xLv(c.top5, c.total, AP.t5a, AP.t5c), xLvH(c.hhi, AP.hha, AP.hhc));
+    return `<tr><td><span class="inline-block h-2.5 w-2.5 rounded-sm align-middle" style="background:${colorOf(r.emp)}"></span> <span class="font-medium">${esc(nm(r.emp))}</span></td><td class="r">${NUM.format(c.n)}${c.n <= 5 ? '<div class="muted text-xs">poucos tomadores</div>' : ''}</td><td class="wrap"><div class="truncate" style="max-width:240px" title="${esc(c.top ? c.top.name : '')}">${c.top ? esc(c.top.name) : '—'}</div>${c.top && X.mset.has(c.top.docD) ? '<span class="badge b-info">Grupo</span>' : ''}</td><td class="r">${pct(c.top1 / c.total)}</td><td class="r">${pct(c.top5 / c.total)}</td><td class="r">${NUM.format(Math.round(c.hhi))}</td><td>${xLvBadge(w)}</td></tr>`;
+  }).join('');
+  const concEmpCard = dCard('Concentração por empresa emitente', `${fmtComp(ref)}. Empresas com poucos tomadores têm concentração alta por natureza: veja a coluna de tomadores antes de concluir.`,
+    `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Empresa</th><th class="r">Tomadores</th><th>Maior tomador</th><th class="r">Maior tomador %</th><th class="r">Top 5 %</th><th class="r">HHI</th><th>Nível</th></tr></thead><tbody>${concEmpRows}</tbody></table></div>`);
+  const stL = { sumiu: '<span class="badge b-neg">Sumiu</span>', caiu: '<span class="badge b-amber">Caiu</span>' };
+  const perdaCard = dCard('Perda de carteira', perda ? `Tomadores relevantes (${AP.topN} maiores nas ${AP.L} ${AP.L === 1 ? 'competência anterior' : 'competências anteriores'}: ${perda.win.map(fmtComp).join(', ')}) que sumiram ou caíram ${AP.queda}% ou mais em ${fmtComp(ref)}. R$ em risco: média anterior (sumiu) ou média anterior menos o faturado (caiu).` : `Precisa de ${AP.L} ${AP.L === 1 ? 'competência anterior' : 'competências anteriores'} na base.`,
+    !perda ? dEmptyMsg(`${fmtComp(ref)} não tem histórico suficiente.`) : perda.alerts.length ? `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>#</th><th>Tomador</th><th>Perfil</th><th>Situação</th><th class="r">Média anterior</th><th class="r">${fmtComp(ref)}</th><th class="r">Variação</th><th class="r">R$ em risco</th></tr></thead><tbody>${perda.alerts.map((r, k) => `<tr><td>${k + 1}</td><td class="wrap">${tomNm(r.t)}</td><td>${r.cls ? xBadge(r.cls) : ''}</td><td>${stL[r.st]}</td><td class="r">${money(r.avg)}</td><td class="r">${mz(r.vc)}</td><td class="r">${xVarHtml(dVar(r.vc, r.avg))}</td><td class="r">${money(r.risk)}</td></tr>`).join('')}</tbody><tfoot><tr><td></td><td>Total em risco (${NUM.format(perda.alerts.length)})</td><td></td><td></td><td class="r">${money(perda.alerts.reduce((a, r) => a + r.avg, 0))}</td><td class="r">${money(perda.alerts.reduce((a, r) => a + r.vc, 0))}</td><td></td><td class="r">${money(perda.risk)}</td></tr></tfoot></table></div><p class="dg-note">Tomadores com cobrança irregular podem aparecer aqui sem terem sido perdidos. Confira o perfil e o histórico na seção de recorrência antes de agir.</p>` : dEmptyMsg(`Nenhum dos ${NUM.format(perda.rel.length)} tomadores relevantes sumiu ou caiu ${AP.queda}% ou mais.`));
+  const altHtml = `<div id="x-sec-alt" class="x-pb" style="scroll-margin-top:90px"><h2 class="t-title">Alertas de concentração e perda de carteira</h2><p class="t-sub">${rangeTxt}</p></div>${aBar}${altSummary}${concCard}${concEmpCard}${perdaCard}`;
+
+  /* ---- detalhe da empresa selecionada ---- */
+  const E = st.emp, eL = E ? X.empAll(E) : [], eRef = summarize(X.listOf(E, ref)), eP = pv ? summarize(X.listOf(E, prev)) : null, eY = summarize(X.ytdOf(eL)), eTot = summarize(eL);
+  const eYM = X.months.filter(m => m.slice(0, 4) === yr && m <= ref).length;
+  const optHtml = [...rows].sort((a, b) => b.tot.vc - a.tot.vc).map(r => `<option value="${r.emp}" ${r.emp === E ? 'selected' : ''}>${esc(nm(r.emp))} · ${esc(fmtCnpj(r.emp))}</option>`).join('');
+  const pickBar = `<section class="card no-print"><div class="dg-bar"><div class="g-f grow"><label class="lbl" for="x-emp">Empresa em detalhe</label><select id="x-emp" class="inp" style="max-width:420px">${optHtml}</select></div></div></section>`;
+  const eKpis = `<div class="card kpis kn" style="--kc:5">
+    <div class="kpi"><div class="kpi-l">Faturamento ${fmtComp(ref)}</div><div class="kpi-v">${money(eRef.vc)}</div><div class="kpi-s">${dTxt(eRef.vc, eP && eP.vc, money)}</div></div>
+    <div class="kpi"><div class="kpi-l">Participação no total</div><div class="kpi-v">${cur.vc && eRef.n ? pct(eRef.vc / cur.vc) : '—'}</div><div class="kpi-s">${fmtComp(ref)}, contra ${eTot.vc && total.vc ? pct(eTot.vc / total.vc) : '—'} no período todo</div></div>
+    <div class="kpi"><div class="kpi-l">Acumulado ${yr}</div><div class="kpi-v">${money(eY.vc)}</div><div class="kpi-s">${NUM.format(eYM)} ${eYM === 1 ? 'competência' : 'competências'}</div></div>
+    <div class="kpi"><div class="kpi-l">NFS-e ${fmtComp(ref)}</div><div class="kpi-v">${NUM.format(eRef.n)}</div><div class="kpi-s">${dTxt(eRef.n, eP && eP.n, NUM.format)}</div></div>
+    <div class="kpi"><div class="kpi-l">Tomadores ${fmtComp(ref)}</div><div class="kpi-v">${NUM.format(eRef.tom)}</div><div class="kpi-s">${dTxt(eRef.tom, eP && eP.tom, NUM.format)}</div></div>
+  </div>`;
+  const monthRows = [...months].reverse().map(m => {
+    const L = X.listOf(E, m), s = summarize(L), pm = months.includes(dPrevYm(m)) ? summarize(X.listOf(E, dPrevYm(m))) : null, tp = xTomadores(L)[0] || null;
+    return `<tr class="${m === ref ? 'dg-hl' : ''}"><td class="font-medium">${fmtComp(m)}</td><td class="r">${xNum(s.n)}</td><td class="r">${xMoney(s.vc, s.n)}</td><td class="r">${s.n && pm && pm.n ? xVarCell(dVar(s.vc, pm.vc), pm.vc) : '<span class="muted">—</span>'}</td>
+      <td class="r">${xMoney(s.ic, s.n)}</td><td class="r">${xNum(s.tom)}</td><td class="r">${s.n ? money(Math.round(s.vc / s.n)) : '<span class="muted">—</span>'}</td><td class="wrap">${tomCell(tp, s.vc)}</td></tr>`;
+  }).join('');
+  const evoE = dCard(`Evolução de ${esc(nm(E))}`, `Todas as competências da base. A linha destacada é a competência de referência.`,
+    `<div class="scroll-y scroll-x" style="max-height:420px"><table class="tbl compact"><thead><tr><th>Competência</th><th class="r">NFS-e</th><th class="r">Faturamento</th><th class="r">Variação</th><th class="r">ISSQN</th><th class="r">Tomadores</th><th class="r">Ticket médio</th><th>Maior tomador</th></tr></thead><tbody>${monthRows}</tbody>
+    <tfoot><tr><td>Período</td><td class="r">${NUM.format(eTot.n)}</td><td class="r">${money(eTot.vc)}</td><td class="r muted">—</td><td class="r">${money(eTot.ic)}</td><td class="r">${NUM.format(eTot.tom)}</td><td class="r">${eTot.n ? money(Math.round(eTot.vc / eTot.n)) : '—'}</td><td></td></tr></tfoot></table></div>`);
+  const tomsRef = xTomadores(X.listOf(E, ref)), top5 = tomsRef.slice(0, X_TOPN), rest = tomsRef.slice(X_TOPN);
+  const restS = rest.reduce((a, t) => ({ vc: a.vc + t.vc, n: a.n + t.n, k: a.k + 1 }), { vc: 0, n: 0, k: 0 });
+  const topRows = top5.map((t, i) => `<tr><td>${i + 1}</td><td class="wrap"><div class="truncate" style="max-width:300px" title="${esc(t.name)}">${esc(t.name)}</div>${X.mset.has(t.docD) ? '<span class="badge b-info">Grupo</span>' : ''}</td><td class="r">${money(t.vc)}</td><td class="r">${eRef.vc ? pct(t.vc / eRef.vc) : '—'}</td><td class="r">${NUM.format(t.n)}</td></tr>`).join('')
+    + (restS.k ? `<tr><td></td><td class="muted">Demais tomadores (${NUM.format(restS.k)})</td><td class="r">${money(restS.vc)}</td><td class="r">${eRef.vc ? pct(restS.vc / eRef.vc) : '—'}</td><td class="r">${NUM.format(restS.n)}</td></tr>` : '');
+  const topCard = dCard(`Maiores tomadores de ${esc(nm(E))}`, `${fmtComp(ref)}. Percentual sobre o faturamento da empresa na competência.`,
+    eRef.n ? `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>#</th><th>Tomador</th><th class="r">Faturamento</th><th class="r">% da empresa</th><th class="r">NFS-e</th></tr></thead><tbody>${topRows}</tbody><tfoot><tr><td></td><td>Total da empresa</td><td class="r">${money(eRef.vc)}</td><td class="r">100,0%</td><td class="r">${NUM.format(eRef.n)}</td></tr></tfoot></table></div>` : dEmptyMsg(`${esc(nm(E))} não tem NFS-e em ${fmtComp(ref)}.`));
+  const recE = xRec(xPerfis(eL, months), months, iRef, RP), reS = recE.sum, reTot = X_CLS.reduce((a, c) => ({ n: a.n + reS[c].n, vc: a.vc + reS[c].vc, hist: a.hist + reS[c].hist }), { n: 0, vc: 0, hist: 0 });
+  const profCard = dCard(`Perfil dos tomadores de ${esc(nm(E))}`, `${fmtComp(ref)}, com os mesmos cortes da seção de recorrência. Frequência medida só nas NFS-e desta empresa.`,
+    `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>Perfil</th><th class="r">Tomadores</th><th class="r">Faturamento</th><th class="r">% da empresa</th></tr></thead><tbody>${X_CLS.map(c => `<tr><td>${xBadge(c)}</td><td class="r">${xNum(reS[c].n)}</td><td class="r">${mz(reS[c].vc)}</td><td class="r">${reS[c].vc && eRef.vc ? pct(reS[c].vc / eRef.vc) : '<span class="muted">—</span>'}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td class="r">${NUM.format(reTot.n)}</td><td class="r">${money(reTot.vc)}</td><td class="r">${eRef.vc ? '100,0%' : '—'}</td></tr></tfoot></table></div>`);
+  const mixM = groupBy(X.listOf(E, ref), n => n.cat).sort((a, b) => b.vc - a.vc);
+  const mixCard = dCard(`Mix de ${esc(opLabel().toLowerCase())} de ${esc(nm(E))}`, `${fmtComp(ref)}.`,
+    mixM.length ? `<div class="scroll-x"><table class="tbl compact"><thead><tr><th>${esc(opLabel())}</th><th class="r">NFS-e</th><th class="r">Faturamento</th><th class="r">% da empresa</th></tr></thead><tbody>${mixM.map(g => `<tr><td>${esc(g.key)}</td><td class="r">${NUM.format(g.n)}</td><td class="r">${money(g.vc)}</td><td class="r">${eRef.vc ? pct(g.vc / eRef.vc) : '—'}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td class="r">${NUM.format(eRef.n)}</td><td class="r">${money(eRef.vc)}</td><td class="r">100,0%</td></tr></tfoot></table></div>` : dEmptyMsg('Sem NFS-e na competência.'));
+
+  /* ---- conferências ---- */
+  const chk = [], add = (s, t, d) => chk.push({ s, t, d });
+  const eq = (a, b) => a === b;
+  const sRows = rows.reduce((a, r) => ({ vc: a.vc + r.c.vc, n: a.n + r.c.n, ic: a.ic + r.c.ic }), { vc: 0, n: 0, ic: 0 });
+  add(eq(sRows.vc, cur.vc) && eq(sRows.n, cur.n) && eq(sRows.ic, cur.ic) ? 'ok' : 'err', 'Soma das empresas = total da competência', `Faturamento ${money(sRows.vc)} contra ${money(cur.vc)}; NFS-e ${NUM.format(sRows.n)} contra ${NUM.format(cur.n)}; ISSQN ${money(sRows.ic)} contra ${money(cur.ic)}.`);
+  const sMes = months.reduce((a, m) => { const s = summarize(X.byM.get(m)); return { vc: a.vc + s.vc, n: a.n + s.n }; }, { vc: 0, n: 0 });
+  add(eq(sMes.vc, total.vc) && eq(sMes.n, total.n) ? 'ok' : 'err', 'Soma das competências = total do período', `${money(sMes.vc)} em ${NUM.format(sMes.n)} NFS-e, contra ${money(total.vc)} em ${NUM.format(total.n)} NFS-e na base.`);
+  const sYtd = months.filter(m => m.slice(0, 4) === yr && m <= ref).reduce((a, m) => a + summarize(X.byM.get(m)).vc, 0);
+  add(eq(sYtd, ytd.vc) ? 'ok' : 'err', `Acumulado ${yr} = soma das competências até ${fmtComp(ref)}`, `${money(sYtd)} contra ${money(ytd.vc)}.`);
+  const sEmpMes = months.reduce((a, m) => a + summarize(X.listOf(E, m)).vc, 0);
+  add(eq(sEmpMes, eTot.vc) ? 'ok' : 'err', `Evolução de ${nm(E)}: soma das competências = total da empresa`, `${money(sEmpMes)} contra ${money(eTot.vc)}.`);
+  const sTop = tomsRef.reduce((a, t) => a + t.vc, 0);
+  add(eq(sTop, eRef.vc) ? 'ok' : 'err', `Tomadores de ${nm(E)} somam o faturamento da empresa em ${fmtComp(ref)}`, `${money(sTop)} contra ${money(eRef.vc)}.`);
+  const sEmpTot = X.emps.reduce((a, e) => a + summarize(X.empAll(e)).vc, 0);
+  add(eq(sEmpTot, total.vc) ? 'ok' : 'err', 'Soma das empresas no período = total da base', `${money(sEmpTot)} contra ${money(total.vc)}.`);
+  const upto = X.base.filter(n => n.ym <= ref), dist = new Set(upto.map(n => n.tomKey)).size, histB = upto.reduce((a, n) => a + n.vc, 0);
+  add(recTot.n === dist ? 'ok' : 'err', 'Recorrência: soma dos tomadores por perfil = tomadores distintos até a referência', `${NUM.format(recTot.n)} contra ${NUM.format(dist)}.`);
+  add(recTot.vc === cur.vc && recTot.hist === histB ? 'ok' : 'err', 'Recorrência: faturamento por perfil fecha com o total', `Competência ${money(recTot.vc)} contra ${money(cur.vc)}; histórico ${money(recTot.hist)} contra ${money(histB)}.`);
+  const serBad = recSeries.filter(r => X_CLS.reduce((a, c) => a + r.sum[c].vc, 0) !== summarize(X.byM.get(r.m)).vc);
+  add(serBad.length ? 'err' : 'ok', 'Recorrência: gráfico por perfil fecha com o faturamento de cada competência', serBad.length ? `${NUM.format(serBad.length)} competências não fecham: ${serBad.map(r => fmtComp(r.m)).join(', ')}.` : `${NUM.format(recSeries.length)} competências conferidas.`);
+  const distE = new Set(eL.filter(n => n.ym <= ref).map(n => n.tomKey)).size;
+  add(reTot.vc === eRef.vc && reTot.n === distE ? 'ok' : 'err', `Perfil dos tomadores de ${nm(E)} fecha com a empresa`, `Faturamento ${money(reTot.vc)} contra ${money(eRef.vc)}; tomadores ${NUM.format(reTot.n)} contra ${NUM.format(distE)}.`);
+  const sFat = xTomadores(X.byM.get(ref) || []).reduce((a, t) => a + t.vc, 0);
+  add(sFat === cur.vc && cc.top1 <= cc.top5 && cc.top5 <= cc.total ? 'ok' : 'err', 'Concentração: fatias dos tomadores somam o faturamento e Maior ≤ Top 5 ≤ total', `Tomadores ${money(sFat)} contra ${money(cur.vc)}; maior ${money(cc.top1)}, Top 5 ${money(cc.top5)}.`);
+  if (perda) add(perda.rel.length <= AP.topN && perda.alerts.every(r => r.risk <= r.avg) && perda.risk === perda.alerts.reduce((a, r) => a + r.risk, 0) ? 'ok' : 'err', 'Perda de carteira: relevantes ≤ N e R$ em risco ≤ média anterior de cada tomador', `${NUM.format(perda.rel.length)} relevantes, ${NUM.format(perda.alerts.length)} em alerta, ${money(perda.risk)} em risco.`);
+  const rs = S.V && S.V.resumo || [], rsErr = rs.filter(r => r.status === 'err').length, rsOk = rs.filter(r => r.status === 'ok').length;
+  if (rs.length) add(rsErr ? 'err' : 'ok', 'Totais do arquivo contra a aba Resumo', rsErr ? `${NUM.format(rsErr)} de ${NUM.format(rs.length)} indicadores não conferem. Detalhes na aba Validação.` : `${NUM.format(rsOk)} de ${NUM.format(rs.length)} indicadores conferem (aba Validação).`);
+  if (X.canc.length) add('info', 'NFS-e canceladas fora da base', `${NUM.format(X.canc.length)} NFS-e (${money(X.canc.reduce((a, n) => a + n.vc, 0))}).`);
+  else add('info', 'Situação', 'Nenhuma NFS-e cancelada nos arquivos. A base considera todas as situações exceto cancelada.');
+  if (X.semComp) add('warn', 'NFS-e sem competência', `${NUM.format(X.semComp)} NFS-e não têm competência nem data e ficam fora desta aba.`);
+  const issN = X.base.filter(n => n.issNull), semDoc = X.base.filter(n => !n.docD);
+  if (issN.length) add('warn', 'NFS-e sem Vlr. ISSQN informado', `${NUM.format(issN.length)} NFS-e (${money(issN.reduce((a, n) => a + n.vc, 0))} de serviço) vêm sem valor de ISSQN e entram como zero no ISSQN. Não há como saber, pela planilha, se é zero ou ausência de informação.`);
+  if (semDoc.length) add('warn', 'Tomadores sem CPF/CNPJ', `${NUM.format(semDoc.length)} NFS-e sem documento do tomador (${money(semDoc.reduce((a, n) => a + n.vc, 0))}). Entram na contagem de tomadores pelo nome ou como "sem tomador", por isso o total de tomadores pode diferir da contagem por CPF/CNPJ do Resumo.`);
+  const nBad = chk.filter(c => c.s === 'err').length;
+  const chkCard = `<div class="card"><div class="card-h"><div><h3 class="t-title">Conferências da Central</h3><p class="t-sub">Valem para a base e a competência escolhidas acima.</p></div></div><div class="card-b">${chk.map(c => `<div class="g-chk">${stIcon(c.s)}<div><b>${esc(c.t)}.</b> ${c.d}</div></div>`).join('')}</div></div>`;
+  if (nBad) notes.unshift(`<div class="alert al-err"><span class="ai">${ico('alert')}</span><div><b class="font-medium">${nBad} ${nBad === 1 ? 'conferência não fecha' : 'conferências não fecham'}.</b> Veja o fim desta aba.</div></div>`);
+
+  /* ---- resumo executivo: leitura gerada só com os dados (sem estimativas) ---- */
+  const SN = xSinais(X), sig = [], sg = (s2, t, d) => sig.push({ s: s2, t, d });
+  const pl = (n, a, b) => `${NUM.format(n)} ${n === 1 ? a : b}`;
+  sg('info', 'Faturamento', `${money(cur.vc)} em ${fmtComp(ref)}${pv && pv.vc ? `, ${signed(dVar(cur.vc, pv.vc), x => pct(x))} contra ${fmtComp(prev)} (${money(pv.vc)})` : ''}. Acumulado ${yr}: ${money(ytd.vc)} em ${pl(X.ytdMonths, 'competência', 'competências')}.`);
+  if (SN.rank && SN.nMonths > 1) sg('info', 'Posição na base', SN.rank === 1 ? `${fmtComp(ref)} é a maior das ${NUM.format(SN.nMonths)} competências carregadas.` : `${fmtComp(ref)} é a ${SN.rank}ª maior das ${NUM.format(SN.nMonths)} competências carregadas. A maior é ${fmtComp(SN.best.m)} (${money(SN.best.vc)}).`);
+  if (SN.top) sg('info', 'Empresas', `${esc(nm(SN.top.emp))} responde por ${pct(SN.topShare)} do faturamento (${money(SN.top.c.vc)})${SN.nAct > 1 ? `; as duas maiores somam ${pct(SN.top2Share)}` : ''}.${SN.up ? ` Maior alta em R$ contra ${fmtComp(prev)}: ${esc(nm(SN.up.r.emp))} (+${money(SN.up.d)}).` : ''}${SN.down ? ` Maior queda: ${esc(nm(SN.down.r.emp))} (−${money(-SN.down.d)}).` : ''}`);
+  sg('info', 'Recorrência', `Tomadores Fixos e Intermitentes respondem por ${recPct(rS.fixo.vc + rS.interm.vc)} do faturamento. ${pl(rS.novo.n, 'tomador novo', 'tomadores novos')} (${money(rS.novo.vc)}) e ${pl(rS.inat.n, 'tomador inativo', 'tomadores inativos')} (${money(rS.inat.hist)} no histórico).`);
+  const lConc = xWorst(l1, l5, lH, lT);
+  sg(lConc, 'Concentração', `Maior tomador ${share(cc.top1)}, Top 5 ${share(cc.top5)}, HHI ${NUM.format(Math.round(cc.hhi))}: ${lConc === 'ok' ? 'dentro dos limites definidos' : lConc === 'warn' ? 'algum indicador em atenção' : 'algum indicador em nível crítico'}.${cc.top && X.mset.has(cc.top.docD) && st.base === 'todas' ? ' O maior tomador é uma empresa do Grupo.' : ''}`);
+  if (perda) sg(lP, 'Perda de carteira', perda.alerts.length ? `${pl(perda.alerts.length, 'tomador relevante sumiu ou caiu', 'tomadores relevantes sumiram ou caíram')}, com ${money(perda.risk)} em risco por competência.` : `Nenhum dos ${NUM.format(perda.rel.length)} tomadores relevantes sumiu ou caiu ${AP.queda}% ou mais.`);
+  else sg('info', 'Perda de carteira', `Sem histórico suficiente em ${fmtComp(ref)} (precisa de ${pl(AP.L, 'competência anterior', 'competências anteriores')}).`);
+  if (st.base === 'todas' && intraRef.n) sg('info', 'Faturamento entre empresas do Grupo', `${money(intraRef.vc)} (${cur.vc ? pct(intraRef.vc / cur.vc) : '—'}) do faturamento de ${fmtComp(ref)}, em ${pl(intraRef.n, 'NFS-e', 'NFS-e')}.`);
+  if (issN.length || semDoc.length) sg('warn', 'Qualidade dos dados', `${issN.length ? `${pl(issN.length, 'NFS-e sem', 'NFS-e sem')} ISSQN informado` : ''}${issN.length && semDoc.length ? ' e ' : ''}${semDoc.length ? `${pl(semDoc.length, 'NFS-e sem', 'NFS-e sem')} CPF/CNPJ do tomador` : ''} na base. Detalhes nas Conferências.`);
+  const nFecha = chk.filter(c => c.s === 'ok').length, nConf = chk.filter(c => c.s === 'ok' || c.s === 'err').length;
+  sg(nBad ? 'err' : 'ok', 'Conferências', `${NUM.format(nFecha)} de ${NUM.format(nConf)} conferências fecham${nBad ? `; ${NUM.format(nBad)} não ${nBad === 1 ? 'fecha' : 'fecham'}` : ''}.`);
+  const resumoCard = `<div class="card"><div class="card-h"><div><h3 class="t-title">Resumo de ${fmtComp(ref)}</h3><p class="t-sub">Leitura gerada só com os dados carregados, na base: ${baseTxt}. Não estima margem, recebimento nem fechamento. ${nCrit || nAt ? `${pl(nCrit, 'alerta crítico', 'alertas críticos')} e ${pl(nAt, 'em atenção', 'em atenção')}.` : 'Nenhum alerta ativo.'}</p></div></div><div class="card-b">${sig.map(x => `<div class="g-chk">${stIcon(x.s)}<div><b>${x.t}.</b> ${x.d}</div></div>`).join('')}</div></div>`;
+  const detHead = `<div id="x-sec-det" class="x-pb" style="scroll-margin-top:90px"><h2 class="t-title">Empresa em detalhe: ${esc(nm(E))}</h2><p class="t-sub">${esc(full(E))}, CNPJ ${esc(fmtCnpj(E))}. Competência de referência: ${fmtComp(ref)}, base: ${baseTxt}.</p></div>`;
+  /* ---- seções (sub-abas): uma por vez na tela, todas na impressão/PDF ---- */
+  const SEC = { emp: `<div id="x-sec-emp">${empCard}</div>${evoCard}`, resumo: resumoCard, rec: recHtml, alt: altHtml,
+    det: `${detHead}${pickBar}${eKpis}<div class="dg-2">${evoE}<div class="space-y-4">${topCard}${mixCard}${profCard}</div></div>`, conf: `<div id="x-sec-conf" class="x-pb" style="scroll-margin-top:90px">${chkCard}</div>` };
+  const SEC_ORDER = ['emp', 'resumo', 'rec', 'alt', 'det', 'conf'];
+  if (!SEC[st.sec]) st.sec = 'emp';
+  const secLbl = { emp: 'Empresas', resumo: 'Resumo', rec: 'Recorrência', alt: nCrit + nAt ? `Alertas (${NUM.format(nCrit + nAt)})` : 'Alertas', det: 'Empresa em detalhe', conf: nBad ? `Conferências (${NUM.format(nBad)})` : 'Conferências' };
+  const secNav = `<nav class="no-print" aria-label="Seções da Central" style="overflow-x:auto"><div class="seg" role="group">${SEC_ORDER.map(k => `<button data-action="x-sec" data-v="${k}" aria-pressed="${k === st.sec}">${secLbl[k]}</button>`).join('')}</div></nav>`;
+  const secBody = S.printing ? SEC_ORDER.map(k => SEC[k]).join('') : SEC[st.sec];
+
+  el.innerHTML = `<div class="no-print"><h2 class="t-title">Central Executiva</h2><p class="t-sub">Todas as empresas emitentes dos arquivos, exceto NFS-e canceladas. Os filtros da Visão geral não valem aqui.</p></div>${bar}${notes.join('')}${kpis}${secNav}${secBody}`;
+
+  /* ---- desenhar o gráfico ---- */
+  const labels = months.map(fmtComp), ordered = [...rows].sort((a, b) => b.tot.vc - a.tot.vc).map(r => r.emp);
+  const sets = ordered.map(e => ({ label: nm(e), data: months.map(m => summarize(X.listOf(e, m)).vc / 100), backgroundColor: colorOf(e), stack: 's', maxBarThickness: 36 }));
+  const compactY = v => compact(v * 100);
+  drawChart('c-exec-evo', { type: 'bar', plugins: [valueLabels], data: { labels, datasets: sets },
+    options: { responsive: true, maintainAspectRatio: false, animation: { duration: S.printing ? 0 : 250 }, interaction: { mode: 'index', intersect: false }, layout: { padding: { top: 18 } },
+      scales: { x: { stacked: true, grid: { display: false }, ticks: { color: th.muted, maxRotation: 0 } }, y: { stacked: true, beginAtZero: true, border: { display: false }, grid: { color: th.grid }, ticks: { color: th.muted, callback: compactY } } },
+      plugins: { valueLabels: { mode: 'total' }, legend: { position: 'bottom', labels: { color: th.ink, boxWidth: 10, boxHeight: 10 } },
+        tooltip: { callbacks: { title: i => 'Competência ' + labels[i[0].dataIndex], label: c => c.parsed.y ? `${c.dataset.label}: ${BRL.format(c.parsed.y)}` : null,
+          footer: items => { const m = months[items[0].dataIndex], s = summarize(X.byM.get(m)); return [`Total: ${money(s.vc)}`, `NFS-e: ${NUM.format(s.n)}`]; } } } } } });
+  if (recSeries.length) {
+    const rl = recSeries.map(r => fmtComp(r.m)), rc = ['fixo', 'interm', 'esp', 'novo'];
+    drawChart('c-exec-rec', { type: 'bar', plugins: [valueLabels], data: { labels: rl, datasets: rc.map((c, k) => ({ label: X_CLS_L[c], data: recSeries.map(r => r.sum[c].vc / 100), backgroundColor: P[k], stack: 's', maxBarThickness: 36 })) },
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: S.printing ? 0 : 250 }, interaction: { mode: 'index', intersect: false }, layout: { padding: { top: 18 } },
+        scales: { x: { stacked: true, grid: { display: false }, ticks: { color: th.muted, maxRotation: 0 } }, y: { stacked: true, beginAtZero: true, border: { display: false }, grid: { color: th.grid }, ticks: { color: th.muted, callback: compactY } } },
+        plugins: { valueLabels: { mode: 'total' }, legend: { position: 'bottom', labels: { color: th.ink, boxWidth: 10, boxHeight: 10 } },
+          tooltip: { callbacks: { title: i => 'Competência ' + rl[i[0].dataIndex], label: c => c.parsed.y ? `${c.dataset.label}: ${BRL.format(c.parsed.y)}` : null,
+            footer: items => { const r = recSeries[items[0].dataIndex], t = X_CLS.reduce((a, c) => a + r.sum[c].vc, 0); return [`Total: ${money(t)}`, `Recorrente (Fixo + Intermitente): ${t ? pct((r.sum.fixo.vc + r.sum.interm.vc) / t) : '—'}`]; } } } } } });
+  }
+}
+function describeX() {
+  const st = xState(); return [`Base: ${st.base === 'terceiros' ? 'sem o faturamento entre empresas do Grupo' : 'todas as NFS-e válidas'}`, st.ref ? `Competência de referência: ${fmtComp(st.ref)}` : '', (() => { const r = xRecP(); return `Recorrência: Fixo a partir de ${r.fixo}%, Intermitente a partir de ${r.interm}%, Novo com menos de ${r.hist} competências, Inativo após ${r.k} sem NFS-e`; })(), (() => { const a = xAltP(); return `Alertas: maior tomador ${a.t1a}%/${a.t1c}%, Top 5 ${a.t5a}%/${a.t5c}%, HHI ${a.hha}/${a.hhc}, ${a.topN} relevantes, queda de ${a.queda}% sobre ${a.L} competências`; })()].filter(Boolean);
 }
 
 /* ---------- Tema ---------- */
@@ -2357,6 +2873,11 @@ const H = {
   'g-clear'() { S.G = gDefaults(); renderGrupo(); },
   'g-tbl'(el) { S.G.tblAll = el.dataset.v === 'all'; renderGrupo(); },
   'd-sec'(el) { S.D.sec = el.dataset.v; renderDiag(); },
+  'x-base'(el) { xState().base = el.dataset.v; renderExec(); },
+  'x-sec'(el) { xState().sec = el.dataset.v; renderExec(); },
+  'x-goto'(el) { const t = document.getElementById(el.dataset.v); if (t) t.scrollIntoView({ behavior: S.printing ? 'auto' : 'smooth', block: 'start' }); },
+  'x-rec-reset'() { const st = xState(); delete st.rec; renderExec(); },
+  'x-alt-reset'() { const st = xState(); delete st.alt; renderExec(); },
   'd-cmp'(el) { S.D.cmp = el.dataset.v; renderDiag(); },
   'd-prev'() { S.D.ref = dPrevYm(S.D.ref); renderDiag(); },
 };
@@ -2386,6 +2907,10 @@ document.addEventListener('change', e => {
   else if (id === 'g-tbl-emp') { S.G.tblEmp = v; renderGrupo(); }
   else if (id === 'g-scope-sel') { S.G.scope = v; renderGrupo(); }
   else if (id === 'd-ref') { S.D.ref = v; renderDiag(); }
+  else if (id === 'x-ref') { xState().ref = v; renderExec(); }
+  else if (id === 'x-emp') { xState().emp = v; renderExec(); }
+  else if (id.startsWith('x-r-') && e.target.type === 'number') { xSetRec(id.slice(4), v); }
+  else if (id.startsWith('x-a-') && e.target.type === 'number') { xSetAlt(id.slice(4), v); }
   else if (id === 'f-month') { S.F.month = v; onFilterChange(); }
   else if (id === 'f-from') { S.F.from = v; onFilterChange(); }
   else if (id === 'f-to') { S.F.to = v; onFilterChange(); }
